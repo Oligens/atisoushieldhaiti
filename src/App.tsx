@@ -16,14 +16,18 @@ export type Screen = 'dashboard' | 'assistant' | 'scanner' | 'safety' | 'locatio
 function AppContent() {
   const { isAuthenticated } = useAuth();
   const [activeScreen, setActiveScreen] = useState<Screen>('dashboard');
-  const [isOnline, setIsOnline] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
     const checkScreenSize = () => setIsDesktop(window.innerWidth >= 1024);
+    const online = () => setIsOnline(true);
+    const offline = () => setIsOnline(false);
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
+    window.addEventListener('online', online);
+    window.addEventListener('offline', offline);
+    return () => { window.removeEventListener('resize', checkScreenSize); window.removeEventListener('online', online); window.removeEventListener('offline', offline); };
   }, []);
 
   if (!isAuthenticated) return <Login />;
@@ -43,7 +47,7 @@ function AppContent() {
   if (isDesktop) {
     return (
       <div className="min-h-screen flex relative">
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 cursor-pointer glass-panel ${isOnline ? 'neon-border-green text-neon-green' : 'neon-border-amber text-neon-amber'}`} onClick={() => setIsOnline(!isOnline)}>
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 cursor-pointer glass-panel ${isOnline ? 'neon-border-green text-neon-green' : 'neon-border-amber text-neon-amber'}`}>
           <div className={`status-dot ${isOnline ? 'status-dot-green' : 'status-dot-amber'}`}></div>
           <span className="text-glow-cyan">{isOnline ? 'EN LIGNE' : 'HORS-LIGNE'}</span>
         </div>
@@ -55,7 +59,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen flex flex-col max-w-md mx-auto relative">
-      <div className={`fixed top-3 right-3 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 glass-panel ${isOnline ? 'neon-border-green text-neon-green' : 'neon-border-amber text-neon-amber'}`} onClick={() => setIsOnline(!isOnline)}>
+      <div className={`fixed top-3 right-3 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 glass-panel ${isOnline ? 'neon-border-green text-neon-green' : 'neon-border-amber text-neon-amber'}`}>
         <div className={`status-dot ${isOnline ? 'status-dot-green' : 'status-dot-amber'}`}></div>
         <span className="text-glow-cyan">{isOnline ? 'EN LIGNE' : 'HORS-LIGNE'}</span>
       </div>

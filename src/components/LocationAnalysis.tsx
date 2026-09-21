@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
 import { getCurrentPosition, getWeatherData, LocationData, WeatherData } from '../services/geolocation';
+import { saveWeatherObservation } from '../services/researchData';
 
 interface LocationAnalysisProps { isDesktop: boolean; }
 
@@ -20,6 +21,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       setLocation(pos);
       const weatherData = await getWeatherData(pos.latitude, pos.longitude);
       setWeather(weatherData);
+      try { await saveWeatherObservation({ latitude: pos.latitude, longitude: pos.longitude, temperature: weatherData.temperature, humidity: weatherData.humidity, wind_speed: weatherData.windSpeed }); } catch { /* La météo reste affichée même si la persistance distante échoue. */ }
     } catch (err: any) {
       setError(err.message);
     }

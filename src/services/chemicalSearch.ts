@@ -1,7 +1,9 @@
 /**
  * Service de recherche de produits chimiques
- * Combine recherche locale et fallback vers API externe/IA
+ * Combine recherche locale (1200+ pesticides) et fallback IA
  */
+
+import { getAllPesticides, searchPesticides, type Pesticide } from '../data/pesticidesData';
 
 export interface ChemicalProduct {
   id: string;
@@ -13,6 +15,21 @@ export interface ChemicalProduct {
   organImpact: string[];
   bioAlternatives: string[];
   precautions: string[];
+}
+
+// Convertir Pesticide vers ChemicalProduct
+function convertPesticide(pesticide: Pesticide): ChemicalProduct {
+  return {
+    id: pesticide.id,
+    name: pesticide.nom,
+    type: pesticide.type,
+    toxicity: pesticide.niveauRisque === 'Élevé' ? 'high' : pesticide.niveauRisque === 'Modéré' ? 'medium' : 'low',
+    toxicityScore: pesticide.scoreToxicite,
+    foodChainImpact: pesticide.impactChaineAlimentaire,
+    organImpact: pesticide.impactOrganes,
+    bioAlternatives: pesticide.equivalentsBiologiques,
+    precautions: pesticide.precautionsStrictes,
+  };
 }
 
 // Base de données locale (simule Supabase/Neon)
@@ -75,15 +92,31 @@ const localDatabase: ChemicalProduct[] = [
 ];
 
 /**
- * Recherche locale dans la base de données
+ * Recherche locale dans la base de données étendue (1200+ pesticides)
  */
-export function searchLocalDatabase(query: string): ChemicalProduct | null {
-  const normalizedQuery = query.toLowerCase().trim();
+export function searchLocalDatabase(query: string): ChemicalProduct[] {
+  const results = searchPesticides(query);
+  return results.map(convertPesticide);
+}
+
+/**
+ * Recherche exacte dans la base locale
+ */
+export function searchExact(query: string): ChemicalProduct | null {
+  const normalizedQuery = query.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
   
-  return localDatabase.find(product => 
-    product.name.toLowerCase().includes(normalizedQuery) ||
-    product.type.toLowerCase().includes(normalizedQuery)
-  ) || null;
+  const database = getAllPesticides();
+  const found = database.find(pesticide => {
+    const normalizedName = pesticide.nom.toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    return normalizedName === normalizedQuery;
+  });
+  
+  return found ? convertPesticide(found) : null;
 }
 
 /**
@@ -150,30 +183,65 @@ export async function generateProductFromAI(productName: string): Promise<Chemic
 
 /**
  * Recherche intelligente avec fallback
- * 1. Cherche dans la base locale
- * 2. Si non trouvé, génère via IA/API externe
+ * 1. Cherche dans la base locale (1200+ pesticides)
+ * 2. Si non trouvé, suggère des alternatives ou génère via IA
  */
 export async function searchProduct(query: string): Promise<{
-  product: ChemicalProduct;
+  products: ChemicalProduct[];
+  suggestions: ChemicalProduct[];
   source: 'local' | 'ai';
 }> {
   // Étape 1: Recherche locale
-  const localResult = searchLocalDatabase(query);
+  const localResults = searchLocalDatabase(query);
   
-  if (localResult) {
+  if (localResults.length > 0) {
     return {
-      product: localResult,
+      products: localResults,
+      suggestions: [],
       source: 'local',
     };
   }
 
-  // Étape 2: Fallback vers IA/API externe
-  const aiResult = await generateProductFromAI(query);
+  // Étape 2: Fallback - Générer des suggestions intelligentes
+  const suggestions = await generateSuggestions(query);
   
   return {
-    product: aiResult,
+    products: [],
+    suggestions,
     source: 'ai',
   };
+}
+
+/**
+ * Génère des suggestions intelligentes basées sur la requête
+ */
+async function generateSuggestions(query: string): Promise<ChemicalProduct[]> {
+  // Simulation d'un appel IA (1 seconde)
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  const database = getAllPesticides();
+  const normalizedQuery = query.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  // Trouver des produits similaires (commence par les mêmes lettres)
+  const suggestions = database
+    .filter(pesticide => {
+      const normalizedName = pesticide.nom.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      return normalizedName.startsWith(normalizedQuery.slice(0, 2));
+    })
+    .slice(0, 5)
+    .map(convertPesticide);
+
+  // Si pas de suggestions, retourner des produits populaires
+  if (suggestions.length === 0) {
+    return database.slice(0, 5).map(convertPesticide);
+  }
+
+  return suggestions;
 }
 
 /**

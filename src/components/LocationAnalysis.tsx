@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
 import { getCurrentPosition, getWeatherData, analyzeAgriculturalConditions, LocationData, WeatherData } from '../services/geolocation';
 
 interface LocationAnalysisProps { isDesktop: boolean; }
@@ -54,7 +55,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
     );
   }
 
-  const analysis = weather ? analyzeAgriculturalConditions(weather) : null;
+  const analysis = weather ? calculateAgriculturalRisk({ temperature: weather.temperature, humidity: weather.humidity, windSpeed: weather.windSpeed }) : null;
 
   return (
     <div className={isDesktop ? 'p-8 animate-fade-in' : 'pt-14 pb-20 min-h-screen px-4 animate-fade-in'}>
@@ -148,12 +149,12 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
                   <i className="fa-solid fa-seedling icon-gold"></i>
                   <span className="gradient-text">ANALYSE AGRICOLE</span>
                 </h3>
-                <div className={`glass-panel rounded-xl p-4 mb-4 ${analysis.overallRisk === 'eleve' ? 'neon-border-amber' : analysis.overallRisk === 'modere' ? 'neon-border-cyan' : 'neon-border-green'}`}>
+                <div className={`glass-panel rounded-xl p-4 mb-4 ${analysis.level === 'eleve' ? 'neon-border-amber' : analysis.level === 'modere' ? 'neon-border-cyan' : 'neon-border-green'}`}>
                   <p className="text-xs font-bold mb-2" style={{ color: analysis.overallRisk === 'eleve' ? '#D4AF37' : analysis.overallRisk === 'modere' ? '#D4AF37' : '#D4AF37' }}>
-                    NIVEAU DE RISQUE : {analysis.overallRisk.toUpperCase()}
+                    NIVEAU DE RISQUE : {analysis.level.toUpperCase()}
                   </p>
                 </div>
-                {analysis.riskFactors.length > 0 && (
+                {analysis.factors.length > 0 && (
                   <div className="mb-4">
                     <p className="text-xs font-bold text-gold mb-2 flex items-center gap-1"><i className="fa-solid fa-triangle-exclamation icon-gold"></i>FACTEURS DE RISQUE :</p>
                     <ul className="space-y-1">

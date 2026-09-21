@@ -8,10 +8,11 @@ import PlantScanner from './components/PlantScanner';
 import ChemicalSafety from './components/ChemicalSafety';
 import LocationAnalysis from './components/LocationAnalysis';
 import Settings from './components/Settings';
+import ResearchMode from './components/ResearchMode';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 
-export type Screen = 'dashboard' | 'assistant' | 'scanner' | 'safety' | 'location' | 'settings';
+export type Screen = 'dashboard' | 'assistant' | 'scanner' | 'safety' | 'location' | 'research' | 'settings';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
@@ -36,6 +37,7 @@ function AppContent() {
       case 'scanner': return <PlantScanner isDesktop={isDesktop} />;
       case 'safety': return <ChemicalSafety isDesktop={isDesktop} />;
       case 'location': return <LocationAnalysis isDesktop={isDesktop} />;
+      case 'research': return <ResearchMode isDesktop={isDesktop} />;
       case 'settings': return <Settings isDesktop={isDesktop} />;
       default: return <Dashboard onNavigate={setActiveScreen} isDesktop={isDesktop} />;
     }
@@ -56,7 +58,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen flex flex-col max-w-md mx-auto relative">
-      <div className={`fixed top-3 right-3 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 glass-panel ${isOnline ? 'neon-border-green text-neon-green' : 'neon-border-amber text-neon-amber'}`} onClick={() => setIsOnline(!isOnline)}>
+      <div className={`fixed top-3 right-3 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 glass-panel ${isOnline ? 'neon-border-green text-neon-green' : 'neon-border-amber text-neon-amber'}`}>
         <div className={`status-dot ${isOnline ? 'status-dot-green' : 'status-dot-amber'}`}></div>
         <span className="text-glow-cyan">{isOnline ? 'EN LIGNE' : 'HORS-LIGNE'}</span>
       </div>

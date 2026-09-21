@@ -1,3 +1,5 @@
+declare const process: { env: Record<string, string | undefined> };
+
 type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
 function json(res: any, status: number, body: unknown) {

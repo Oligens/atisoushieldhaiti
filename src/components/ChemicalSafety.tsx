@@ -11,6 +11,8 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [dataSource, setDataSource] = useState<'local' | 'ai' | null>(null);
   const [allProducts] = useState<ChemicalProduct[]>(getAllPesticides());
+  const [displayCount, setDisplayCount] = useState(20); // Nombre initial affiché
+  const ITEMS_PER_PAGE = 20; // Incrément de pagination
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
@@ -35,10 +37,19 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
     setSearchQuery(value);
     if (value.trim()) {
       handleSearch(value);
+      setDisplayCount(20); // Réinitialiser la pagination lors d'une recherche
     } else {
       setSelectedProduct(null);
       setDataSource(null);
     }
+  };
+
+  const handleShowMore = () => {
+    setDisplayCount(prev => prev + ITEMS_PER_PAGE);
+  };
+
+  const handleShowLess = () => {
+    setDisplayCount(prev => Math.max(20, prev - ITEMS_PER_PAGE));
   };
 
   const toxicityColors = {
@@ -216,47 +227,96 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
           </div>
         </div>
       ) : (
-        /* Liste des produits */
-        <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-4 gap-4' : 'space-y-3'}>
-          {allProducts.map((product) => (
-            <button
-              key={product.id}
-              onClick={() => {
-                setSelectedProduct(product);
-                setSearchQuery(product.name);
-                setDataSource('local');
-              }}
-              className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
-                  <span className="text-2xl">
-                    {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
+        /* Liste des produits avec pagination */
+        <div>
+          {/* Indicateur du nombre total */}
+          <div className="mb-4 glass-panel rounded-xl px-4 py-2 inline-flex items-center gap-2">
+            <i className="fa-solid fa-database icon-gold"></i>
+            <span className="text-xs text-body">
+              Base de données : <strong className="text-gold">{allProducts.length}</strong> pesticides disponibles
+            </span>
+          </div>
+
+          {/* Grille des produits */}
+          <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-4 gap-4' : 'space-y-3'}>
+            {allProducts.slice(0, displayCount).map((product) => (
+              <button
+                key={product.id}
+                onClick={() => {
+                  setSelectedProduct(product);
+                  setSearchQuery(product.name);
+                  setDataSource('local');
+                }}
+                className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
+                    <span className="text-2xl">
+                      {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-body">{product.name}</h3>
+                    <p className="text-xs text-body-secondary">{product.type}</p>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${toxicityColors[product.toxicity].bg} ${toxicityColors[product.toxicity].text}`}>
+                    {toxicityColors[product.toxicity].label}
                   </span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-bold text-body">{product.name}</h3>
-                  <p className="text-xs text-body-secondary">{product.type}</p>
+                <div className="w-full bg-cyber-bg-deep rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${
+                      product.toxicity === 'high'
+                        ? 'bg-neon-red'
+                        : product.toxicity === 'medium'
+                        ? 'bg-neon-amber'
+                        : 'bg-neon-green'
+                    }`}
+                    style={{ width: `${product.toxicityScore}%` }}
+                  ></div>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${toxicityColors[product.toxicity].bg} ${toxicityColors[product.toxicity].text}`}>
-                  {toxicityColors[product.toxicity].label}
-                </span>
-              </div>
-              <div className="w-full bg-cyber-bg-deep rounded-full h-2">
+                <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
+              </button>
+            ))}
+          </div>
+
+          {/* Boutons de pagination */}
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center items-center">
+            {/* Bouton Afficher moins */}
+            {displayCount > 20 && (
+              <button
+                onClick={handleShowLess}
+                className="glass-panel neon-border-cyan text-gold rounded-xl px-6 py-3 font-medium hover:glass-panel-hover flex items-center gap-2 transition-all"
+              >
+                <i className="fa-solid fa-chevron-up icon-gold"></i>
+                Afficher moins
+              </button>
+            )}
+
+            {/* Indicateur de progression */}
+            <div className="glass-panel rounded-xl px-4 py-3 text-center">
+              <p className="text-xs text-body-secondary">
+                Affichage : <strong className="text-gold">{Math.min(displayCount, allProducts.length)}</strong> / <strong className="text-gold">{allProducts.length}</strong>
+              </p>
+              <div className="w-full bg-cyber-bg-deep rounded-full h-1.5 mt-2">
                 <div
-                  className={`h-2 rounded-full ${
-                    product.toxicity === 'high'
-                      ? 'bg-neon-red'
-                      : product.toxicity === 'medium'
-                      ? 'bg-neon-amber'
-                      : 'bg-neon-green'
-                  }`}
-                  style={{ width: `${product.toxicityScore}%` }}
+                  className="h-1.5 rounded-full bg-neon-cyan transition-all duration-300"
+                  style={{ width: `${(Math.min(displayCount, allProducts.length) / allProducts.length) * 100}%` }}
                 ></div>
               </div>
-              <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
-            </button>
-          ))}
+            </div>
+
+            {/* Bouton Afficher plus */}
+            {displayCount < allProducts.length && (
+              <button
+                onClick={handleShowMore}
+                className="cyber-button rounded-xl px-6 py-3 font-medium flex items-center gap-2 transition-all"
+              >
+                <i className="fa-solid fa-plus icon-gold"></i>
+                Afficher plus ({ITEMS_PER_PAGE})
+              </button>
+            )}
+          </div>
         </div>
       )}
 

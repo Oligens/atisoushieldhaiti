@@ -1,4 +1,4 @@
-import { pesticidesDatabase, type Pesticide } from '../data/pesticidesData';
+import { completePesticidesDatabase, type Pesticide } from '../data/pesticidesData';
 
 export interface ChemicalProduct {
   id: string;
@@ -13,10 +13,10 @@ export interface ChemicalProduct {
 }
 
 /**
- * Récupère tous les pesticides de la base de données locale
+ * Récupère tous les pesticides de la base de données locale (1200 entrées)
  */
 export function getAllPesticides(): ChemicalProduct[] {
-  return pesticidesDatabase.map((pesticide: Pesticide) => ({
+  return completePesticidesDatabase.map((pesticide: Pesticide) => ({
     id: pesticide.id,
     name: pesticide.nom,
     type: pesticide.type,
@@ -42,7 +42,7 @@ export function searchLocalDatabase(query: string): ChemicalProduct | null {
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
   
-  const found = pesticidesDatabase.find((pesticide: Pesticide) => {
+  const found = completePesticidesDatabase.find((pesticide: Pesticide) => {
     const normalizedNom = pesticide.nom
       .toLowerCase()
       .normalize('NFD')

@@ -8,6 +8,7 @@ interface BottomNavProps {
 const navItems: { id: Screen; icon: string; label: string }[] = [
   { id: 'dashboard', icon: 'fa-house', label: 'Accueil' },
   { id: 'location', icon: 'fa-map-location-dot', label: 'Lieu' },
+  { id: 'research', icon: 'fa-flask', label: 'Recherche' },
   { id: 'assistant', icon: 'fa-comments', label: 'IA' },
   { id: 'scanner', icon: 'fa-camera', label: 'Scanner' },
   { id: 'settings', icon: 'fa-gear', label: 'Réglages' },

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { analyzePlantImage, type VisionDiagnosis } from '../services/agriculturalAI';
-import { saveAgriculturalCase, updateCaseValidation } from '../services/researchData';
+import { attachWeatherToCase, saveAgriculturalCase, updateCaseValidation } from '../services/researchData';
+import { getWeatherData } from '../services/geolocation';
 import type { ValidationLabel } from '../services/fieldValidation';
 
 interface PlantScannerProps { isDesktop: boolean; }
@@ -43,6 +44,18 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
             field_outcome: null
           });
           setCaseId(saved.id);
+          if (match) {
+            try {
+              const weather = await getWeatherData(Number(match[1]), Number(match[2]));
+              await attachWeatherToCase(saved.id, {
+                temperature: weather.temperature,
+                humidity: weather.humidity,
+                windSpeed: weather.windSpeed,
+                description: weather.description,
+                observedAt: new Date().toISOString()
+              });
+            } catch { /* Le diagnostic reste enregistré même si la météo distante est indisponible. */ }
+          }
         } catch (dbError) {
           setError(dbError instanceof Error ? dbError.message : 'Enregistrement du cas impossible.');
         }

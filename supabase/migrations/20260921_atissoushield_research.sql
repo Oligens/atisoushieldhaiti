@@ -10,6 +10,7 @@ create table if not exists public.agricultural_cases (
   predicted_disease text not null,
   confidence integer not null default 0 check (confidence between 0 and 100),
   validation_label text check (validation_label in ('confirmed','rejected','uncertain')),
+  actual_disease text,
   validated_at timestamptz,
   field_outcome text,
   weather jsonb,
@@ -32,6 +33,7 @@ create index if not exists agricultural_cases_created_at_idx on public.agricultu
 create index if not exists agricultural_cases_location_idx on public.agricultural_cases(location);
 create index if not exists agricultural_cases_crop_idx on public.agricultural_cases(crop);
 create index if not exists agricultural_cases_disease_idx on public.agricultural_cases(predicted_disease);
+create index if not exists agricultural_cases_actual_disease_idx on public.agricultural_cases(actual_disease);
 create index if not exists weather_observations_observed_at_idx on public.weather_observations(observed_at desc);
 
 alter table public.agricultural_cases enable row level security;

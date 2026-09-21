@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
-import { getCurrentPosition, getWeatherData, analyzeAgriculturalConditions, LocationData, WeatherData } from '../services/geolocation';
+import { getCurrentPosition, getWeatherData, LocationData, WeatherData } from '../services/geolocation';
 
 interface LocationAnalysisProps { isDesktop: boolean; }
 

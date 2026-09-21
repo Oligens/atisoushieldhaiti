@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { searchProduct, getAllLocalProducts, type ChemicalProduct } from '../services/chemicalSearch';
+import { useMemo, useState } from 'react';
+import { getAllLocalProducts, type ChemicalProduct } from '../services/chemicalSearch';
 
 interface ChemicalSafetyProps {
   isDesktop: boolean;
@@ -8,37 +8,54 @@ interface ChemicalSafetyProps {
 export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<ChemicalProduct | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [dataSource, setDataSource] = useState<'local' | 'ai' | null>(null);
   const [allProducts] = useState<ChemicalProduct[]>(getAllLocalProducts());
 
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) {
-      setSelectedProduct(null);
-      setDataSource(null);
-      return;
-    }
+  const INITIAL_VISIBLE_COUNT = isDesktop ? 12 : 8;
+  const LOAD_MORE_COUNT = isDesktop ? 12 : 8;
 
-    setIsLoading(true);
-    try {
-      const result = await searchProduct(query);
-      setSelectedProduct(result.product);
-      setDataSource(result.source);
-    } catch (error) {
-      console.error('Erreur lors de la recherche:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase('fr-FR');
+
+    if (!normalizedQuery) return allProducts;
+
+    return allProducts.filter((product) =>
+      [product.name, product.type, product.foodChainImpact, ...product.organImpact]
+        .join(' ')
+        .toLocaleLowerCase('fr-FR')
+        .includes(normalizedQuery)
+    );
+  }, [allProducts, searchQuery]);
+
+  const visibleProducts = useMemo(() => {
+    if (searchQuery.trim()) return filteredProducts;
+
+    const visibleCount = isExpanded ? allProducts.length : INITIAL_VISIBLE_COUNT;
+    return allProducts.slice(0, visibleCount);
+  }, [allProducts, filteredProducts, searchQuery, isExpanded, INITIAL_VISIBLE_COUNT]);
 
   const handleInputChange = (value: string) => {
     setSearchQuery(value);
-    if (value.trim()) {
-      handleSearch(value);
-    } else {
-      setSelectedProduct(null);
-      setDataSource(null);
-    }
+    setSelectedProduct(null);
+    setDataSource(null);
+
+    // Une recherche active doit toujours ouvrir la vue filtrée,
+    // indépendamment de l'état du bouton "Afficher plus".
+    if (value.trim()) setIsExpanded(true);
+  };
+
+  const handleProductSelect = (product: ChemicalProduct) => {
+    setSelectedProduct(product);
+    setSearchQuery(product.name);
+    setDataSource('local');
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSelectedProduct(null);
+    setDataSource(null);
+    setIsExpanded(false);
   };
 
   const toxicityColors = {
@@ -46,6 +63,9 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
     medium: { bg: 'glass-panel neon-border-amber', text: 'text-gold', label: 'MODÉRÉ' },
     high: { bg: 'glass-panel neon-border-amber', text: 'text-gold', label: 'ÉLEVÉ' },
   };
+
+  const canExpand = !searchQuery.trim() && visibleProducts.length < allProducts.length;
+  const canCollapse = !searchQuery.trim() && isExpanded;
 
   return (
     <div className={isDesktop ? 'p-8 animate-fade-in' : 'pt-14 pb-20 min-h-screen px-4 animate-fade-in'}>
@@ -58,11 +78,10 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
         </h1>
         <p className="text-sm text-body-secondary mt-2 flex items-center gap-2">
           <i className="fa-solid fa-flask icon-gold"></i>
-          Recherche intelligente avec base de données locale et IA
+          Recherche intelligente dans la base de données locale des pesticides
         </p>
       </div>
 
-      {/* Bannière d'alerte santé */}
       <div className="glass-panel neon-border-amber rounded-2xl p-6 mb-6 flex items-start gap-4">
         <span className="text-3xl">⚠️</span>
         <div>
@@ -73,25 +92,28 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
         </div>
       </div>
 
-      {/* Barre de recherche */}
-      <div className="relative mb-6 max-w-xl">
+      <div className="relative mb-6 max-w-2xl">
         <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 icon-gold"></i>
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => handleInputChange(e.target.value)}
-          placeholder="Rechercher un pesticide (ex: Glyphosate, Chlorpyrifos...)"
-          className="cyber-input w-full rounded-2xl pl-12 pr-5 py-4 text-sm"
-          disabled={isLoading}
+          placeholder="Rechercher parmi tous les pesticides (nom, type, impact...)"
+          className="cyber-input w-full rounded-2xl pl-12 pr-12 py-4 text-sm"
+          aria-label="Rechercher un pesticide dans la base locale"
         />
-        {isLoading && (
-          <div className="absolute right-5 top-1/2 -translate-y-1/2">
-            <div className="w-5 h-5 border-2 border-neon-cyan border-t-transparent rounded-full animate-spin"></div>
-          </div>
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={clearSearch}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gold hover:text-gold-light transition-colors"
+            aria-label="Effacer la recherche"
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
         )}
       </div>
 
-      {/* Indicateur de source */}
       {dataSource && selectedProduct && (
         <div className="mb-4 glass-panel rounded-xl px-4 py-2 inline-flex items-center gap-2">
           <i className={`fa-solid ${dataSource === 'local' ? 'fa-database' : 'fa-robot'} icon-gold`}></i>
@@ -101,15 +123,10 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
         </div>
       )}
 
-      {/* Vue détaillée du produit sélectionné */}
       {selectedProduct ? (
         <div className="animate-fade-in">
           <button
-            onClick={() => {
-              setSelectedProduct(null);
-              setSearchQuery('');
-              setDataSource(null);
-            }}
+            onClick={clearSearch}
             className="flex items-center gap-2 text-sm text-gold font-medium mb-6 hover:underline"
           >
             <i className="fa-solid fa-arrow-left icon-gold"></i>
@@ -117,7 +134,6 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
           </button>
 
           <div className={isDesktop ? 'grid grid-cols-2 gap-8' : 'space-y-4'}>
-            {/* Colonne gauche : Informations principales */}
             <div className="glass-panel rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -129,7 +145,6 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
                 </div>
               </div>
 
-              {/* Score de toxicité */}
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-body-secondary">Score de toxicité</span>
@@ -151,7 +166,6 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
                 </div>
               </div>
 
-              {/* Impact chaîne alimentaire */}
               <div className="mb-6">
                 <h4 className="text-sm font-bold text-body mb-3 flex items-center gap-2">
                   🍽️ Impact sur la chaîne alimentaire
@@ -161,7 +175,6 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
                 </p>
               </div>
 
-              {/* Impact sur les organes */}
               <div>
                 <h4 className="text-sm font-bold text-body mb-3 flex items-center gap-2">
                   🫀 Impact sur les organes
@@ -177,9 +190,7 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
               </div>
             </div>
 
-            {/* Colonne droite : Alternatives et précautions */}
             <div className="space-y-6">
-              {/* Équivalents biologiques */}
               <div className="glass-panel neon-border-green rounded-2xl p-6">
                 <h4 className="text-base font-bold text-body mb-4 flex items-center gap-2">
                   <i className="fa-solid fa-leaf icon-gold"></i>
@@ -197,7 +208,6 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
                 </div>
               </div>
 
-              {/* Précautions */}
               <div className="glass-panel neon-border-amber rounded-2xl p-6">
                 <h4 className="text-base font-bold text-body mb-4 flex items-center gap-2">
                   <i className="fa-solid fa-triangle-exclamation icon-gold"></i>
@@ -216,63 +226,122 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
           </div>
         </div>
       ) : (
-        /* Liste des produits */
-        <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-4 gap-4' : 'space-y-3'}>
-          {allProducts.map((product) => (
-            <button
-              key={product.id}
-              onClick={() => {
-                setSelectedProduct(product);
-                setSearchQuery(product.name);
-                setDataSource('local');
-              }}
-              className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
-                  <span className="text-2xl">
-                    {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-bold text-body">{product.name}</h3>
-                  <p className="text-xs text-body-secondary">{product.type}</p>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${toxicityColors[product.toxicity].bg} ${toxicityColors[product.toxicity].text}`}>
-                  {toxicityColors[product.toxicity].label}
-                </span>
-              </div>
-              <div className="w-full bg-cyber-bg-deep rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full ${
-                    product.toxicity === 'high'
-                      ? 'bg-neon-red'
-                      : product.toxicity === 'medium'
-                      ? 'bg-neon-amber'
-                      : 'bg-neon-green'
-                  }`}
-                  style={{ width: `${product.toxicityScore}%` }}
-                ></div>
-              </div>
-              <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
-            </button>
-          ))}
-        </div>
-      )}
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-base font-bold text-body">Base locale des pesticides</h2>
+              <p className="text-xs text-body-secondary mt-1">
+                {searchQuery.trim()
+                  ? `${filteredProducts.length} résultat${filteredProducts.length > 1 ? 's' : ''} correspondant à « ${searchQuery} »`
+                  : `${allProducts.length} produit${allProducts.length > 1 ? 's' : ''} disponible${allProducts.length > 1 ? 's' : ''}`}
+              </p>
+            </div>
+            {!searchQuery.trim() && (
+              <span className="glass-panel rounded-full px-3 py-1.5 text-xs text-gold flex items-center gap-2">
+                <i className="fa-solid fa-database icon-gold"></i>
+                Base locale
+              </span>
+            )}
+          </div>
 
-      {/* Engagement */}
-      {!selectedProduct && (
-        <div className="mt-8 glass-panel neon-border-green rounded-2xl p-6">
-          <h3 className="text-base font-bold text-body mb-2 flex items-center gap-2">
-            <i className="fa-solid fa-globe icon-gold"></i>
-            <span className="gradient-text">NOTRE ENGAGEMENT</span>
-          </h3>
-          <p className="text-sm text-body-secondary leading-relaxed">
-            AtisouShield Haïti promeut l'agriculture durable et la protection de la santé publique. 
-            Notre système de recherche combine une base de données locale avec une IA open source pour fournir 
-            des informations complètes sur tous les produits chimiques, même ceux non répertoriés localement.
-          </p>
-        </div>
+          {visibleProducts.length > 0 ? (
+            <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-4 gap-4' : 'grid grid-cols-1 gap-3'}>
+              {visibleProducts.map((product) => (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => handleProductSelect(product)}
+                  className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover border border-[#D4AF37]/20"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
+                      <span className="text-2xl">
+                        {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-body truncate">{product.name}</h3>
+                      <p className="text-xs text-body-secondary truncate">{product.type}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${toxicityColors[product.toxicity].bg} ${toxicityColors[product.toxicity].text}`}>
+                      {toxicityColors[product.toxicity].label}
+                    </span>
+                  </div>
+                  <div className="w-full bg-cyber-bg-deep rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${
+                        product.toxicity === 'high'
+                          ? 'bg-neon-red'
+                          : product.toxicity === 'medium'
+                          ? 'bg-neon-amber'
+                          : 'bg-neon-green'
+                      }`}
+                      style={{ width: `${product.toxicityScore}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="glass-panel rounded-2xl p-10 text-center">
+              <div className="w-14 h-14 mx-auto rounded-full glass-panel neon-border-amber flex items-center justify-center mb-4">
+                <i className="fa-solid fa-magnifying-glass icon-gold text-xl"></i>
+              </div>
+              <h3 className="text-base font-bold text-body">Aucun pesticide trouvé</h3>
+              <p className="text-sm text-body-secondary mt-2">
+                Aucun produit local ne correspond à « {searchQuery} ».
+              </p>
+            </div>
+          )}
+
+          {(canExpand || canCollapse) && (
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <div className="flex flex-wrap justify-center gap-3">
+                {canExpand && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(true)}
+                    className="cyber-button rounded-xl px-6 py-3 font-semibold flex items-center gap-2 border border-[#D4AF37]"
+                    aria-label="Afficher plus de pesticides"
+                  >
+                    <span className="text-lg leading-none">+</span>
+                    Afficher plus
+                  </button>
+                )}
+                {canCollapse && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(false)}
+                    className="rounded-xl px-6 py-3 font-semibold flex items-center gap-2 text-gold bg-transparent border border-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all"
+                    aria-label="Réduire la liste des pesticides"
+                  >
+                    <span className="text-lg leading-none">−</span>
+                    Réduire
+                  </button>
+                )}
+              </div>
+              {!searchQuery.trim() && (
+                <p className="text-xs text-body-secondary">
+                  {isExpanded
+                    ? `Affichage complet : ${allProducts.length} produit${allProducts.length > 1 ? 's' : ''}`
+                    : `Affichage initial : ${Math.min(INITIAL_VISIBLE_COUNT, allProducts.length)} produit${Math.min(INITIAL_VISIBLE_COUNT, allProducts.length) > 1 ? 's' : ''}`}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-8 glass-panel neon-border-green rounded-2xl p-6">
+            <h3 className="text-base font-bold text-body mb-2 flex items-center gap-2">
+              <i className="fa-solid fa-globe icon-gold"></i>
+              <span className="gradient-text">NOTRE ENGAGEMENT</span>
+            </h3>
+            <p className="text-sm text-body-secondary leading-relaxed">
+              AtisouShield Haïti promeut l'agriculture durable et la protection de la santé publique.
+              La recherche ci-dessus parcourt directement la base locale chargée dans l'application.
+            </p>
+          </div>
+        </>
       )}
     </div>
   );

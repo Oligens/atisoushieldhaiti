@@ -37,6 +37,13 @@ export async function saveAgriculturalCase(input: Omit<AgriculturalCase, 'id' | 
   return data as AgriculturalCase;
 }
 
+export async function attachWeatherToCase(id: string, weather: Record<string, unknown>) {
+  if (!supabase) throw new Error('Supabase non configuré.');
+  const { data, error } = await supabase.from('agricultural_cases').update({ weather }).eq('id', id).select().single();
+  if (error) throw error;
+  return data as AgriculturalCase;
+}
+
 export async function updateCaseValidation(id: string, label: AgriculturalCase['validation_label'], fieldOutcome?: string, actualDisease?: string) {
   if (!supabase) throw new Error('Supabase non configuré.');
   const { data, error } = await supabase.from('agricultural_cases').update({

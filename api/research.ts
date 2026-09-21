@@ -48,7 +48,7 @@ export default async function handler(req: any, res: any) {
     }
     if (req.method === 'PATCH' && path === 'cases') {
       if (!body.id) return json(res,400,{error:'Identifiant de cas requis.'});
-      const r=await sql`UPDATE agricultural_cases SET validation_label=${body.validation_label??null}, actual_disease=${body.actual_disease?.trim()||null}, field_outcome=${body.field_outcome??null}, validated_at=NOW(), weather=COALESCE(${body.weather??null},weather) WHERE id=${body.id} AND (user_id=${actor} OR ${actor}='anonymous') RETURNING *`;
+      const r=await sql`UPDATE agricultural_cases SET validation_label=${body.validation_label??null}, actual_disease=${body.actual_disease?.trim()||null}, field_outcome=${body.field_outcome??null}, weather=COALESCE(${body.weather??null},weather) WHERE id=${body.id} AND (user_id=${actor} OR ${actor}='anonymous') RETURNING *`;
       if(!r.length)return json(res,404,{error:'Cas introuvable.'}); return json(res,200,r[0]);
     }
     if (req.method === 'PATCH' && path === 'cases-weather') {
@@ -57,7 +57,7 @@ export default async function handler(req: any, res: any) {
       if(!r.length)return json(res,404,{error:'Cas introuvable.'}); return json(res,200,r[0]);
     }
     if (req.method === 'POST' && path === 'weather-observations') {
-      const r=await sql`INSERT INTO weather_observations (user_id,observed_at,latitude,longitude,temperature,humidity,wind_speed,rainfall_mm,source) VALUES (${actor},${body.observed_at??new Date().toISOString()},${body.latitude},${body.longitude},${body.temperature},${body.humidity},${body.wind_speed},${body.rainfall_mm??0},${body.source??'AtisouShield'}) RETURNING *`;
+      const r=await sql`INSERT INTO weather_observations (user_id,observed_at,latitude,longitude,temperature,humidity,wind_speed,rainfall,weather) VALUES (${actor},${body.observed_at??new Date().toISOString()},${body.latitude},${body.longitude},${body.temperature},${body.humidity},${body.wind_speed},${body.rainfall ?? body.rainfall_mm ?? 0},${body.weather ?? null}) RETURNING *`;
       return json(res,201,r[0]);
     }
     return json(res,404,{error:'Route de recherche inconnue.'});

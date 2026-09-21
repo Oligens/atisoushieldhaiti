@@ -55,7 +55,13 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
     );
   }
 
-  const analysis = weather ? calculateAgriculturalRisk({ temperature: weather.temperature, humidity: weather.humidity, windSpeed: weather.windSpeed }) : null;
+  const analysis = weather
+    ? calculateAgriculturalRisk({
+        temperature: weather.temperature,
+        humidity: weather.humidity,
+        windSpeed: weather.windSpeed,
+      })
+    : null;
 
   return (
     <div className={isDesktop ? 'p-8 animate-fade-in' : 'pt-14 pb-20 min-h-screen px-4 animate-fade-in'}>
@@ -149,11 +155,18 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
                   <i className="fa-solid fa-seedling icon-gold"></i>
                   <span className="gradient-text">ANALYSE AGRICOLE</span>
                 </h3>
-                <div className={`glass-panel rounded-xl p-4 mb-4 ${analysis.level === 'eleve' ? 'neon-border-amber' : analysis.level === 'modere' ? 'neon-border-cyan' : 'neon-border-green'}`}>
-                  <p className="text-xs font-bold mb-2" style={{ color: analysis.level === 'eleve' ? '#D4AF37' : analysis.level === 'modere' ? '#D4AF37' : '#D4AF37' }}>
+                <div className={`glass-panel rounded-xl p-4 mb-4 ${
+                  analysis.level === 'eleve'
+                    ? 'neon-border-amber'
+                    : analysis.level === 'modere'
+                      ? 'neon-border-cyan'
+                      : 'neon-border-green'
+                }`}>
+                  <p className="text-xs font-bold mb-2 text-gold">
                     NIVEAU DE RISQUE : {analysis.level.toUpperCase()}
                   </p>
                 </div>
+
                 {analysis.factors.length > 0 && (
                   <div className="mb-4">
                     <p className="text-xs font-bold text-gold mb-2 flex items-center gap-1"><i className="fa-solid fa-triangle-exclamation icon-gold"></i>FACTEURS DE RISQUE :</p>
@@ -164,6 +177,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
                     </ul>
                   </div>
                 )}
+
                 {analysis.recommendations.length > 0 && (
                   <div>
                     <p className="text-xs font-bold text-gold mb-2 flex items-center gap-1"><i className="fa-solid fa-lightbulb icon-gold"></i>RECOMMANDATIONS :</p>

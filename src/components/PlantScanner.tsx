@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { analyzePlantImage, type VisionDiagnosis } from '../services/agriculturalAI';
+import { saveFieldValidation, type ValidationLabel } from '../services/fieldValidation';
 
 interface PlantScannerProps { isDesktop: boolean; }
 
@@ -10,6 +11,9 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
   const [crop, setCrop] = useState('');
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
+  const [crop, setCrop] = useState('');
+  const [location, setLocation] = useState('');
+  const [validation, setValidation] = useState<ValidationLabel | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 

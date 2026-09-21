@@ -1,12 +1,10 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
 type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
-function json(res: VercelResponse, status: number, body: unknown) {
+function json(res: any, status: number, body: unknown) {
   res.status(status).setHeader('Content-Type', 'application/json').json(body);
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Méthode non autorisée.' });
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;

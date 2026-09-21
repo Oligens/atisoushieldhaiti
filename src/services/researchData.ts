@@ -67,7 +67,7 @@ export async function loadResearchStats(): Promise<ResearchStats> {
   if (!supabase) throw new Error('Supabase non configuré. Ajoutez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.');
   const { data, error } = await supabase.from('agricultural_cases').select('crop,location,predicted_disease,confidence,validation_label,actual_disease');
   if (error) throw error;
-  const rows = (data ?? []) as Pick<AgriculturalCase, 'crop'|'location'|'predicted_disease'|'confidence'|'validation_label'>[];
+  const rows = (data ?? []) as Pick<AgriculturalCase, 'crop'|'location'|'predicted_disease'|'confidence'|'validation_label'|'actual_disease'>[];
   const count = (key: keyof typeof rows[number]) => {
     const map = new Map<string, number>();
     rows.forEach(row => {

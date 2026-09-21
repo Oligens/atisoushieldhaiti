@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { analyzePlantImage, type VisionDiagnosis } from '../services/agriculturalAI';
-import { saveAgriculturalCase, updateCaseValidation } from '../services/researchData';
+import { attachWeatherToCase, saveAgriculturalCase, updateCaseValidation } from '../services/researchData';
+import { getWeatherData } from '../services/geolocation';
 import type { ValidationLabel } from '../services/fieldValidation';
 
 interface PlantScannerProps { isDesktop: boolean; }
@@ -14,6 +15,7 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
   const [error, setError] = useState('');
   const [validation, setValidation] = useState<ValidationLabel | null>(null);
   const [caseId, setCaseId] = useState<string | null>(null);
+  const [actualDisease, setActualDisease] = useState('');
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,6 +44,18 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
             field_outcome: null
           });
           setCaseId(saved.id);
+          if (match) {
+            try {
+              const weather = await getWeatherData(Number(match[1]), Number(match[2]));
+              await attachWeatherToCase(saved.id, {
+                temperature: weather.temperature,
+                humidity: weather.humidity,
+                windSpeed: weather.windSpeed,
+                description: weather.description,
+                observedAt: new Date().toISOString()
+              });
+            } catch { /* Le diagnostic reste enregistré même si la météo distante est indisponible. */ }
+          }
         } catch (dbError) {
           setError(dbError instanceof Error ? dbError.message : 'Enregistrement du cas impossible.');
         }
@@ -60,7 +74,7 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
 
   const validate = async (label: ValidationLabel) => {
     if (!result || !caseId) return;
-    try { await updateCaseValidation(caseId, label); setValidation(label); }
+    try { await updateCaseValidation(caseId, label, undefined, actualDisease); setValidation(label); }
     catch (e) { setError(e instanceof Error ? e.message : 'Validation terrain impossible.'); }
   };
 
@@ -72,6 +86,7 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
     setShowDetail(null);
     setValidation(null);
     setCaseId(null);
+    setActualDisease('');
   };
 
   const getLocation = () => {
@@ -135,7 +150,7 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
               <div className="flex items-center gap-3 mt-3"><div className="flex-1 bg-cyber-bg-deep rounded-full h-3"><div className="bg-neon-cyan h-3 rounded-full" style={{ width: `${result.confidence}%` }} /></div><span className="text-lg font-bold text-gold">{result.confidence}%</span></div>
               <p className="text-sm text-body-secondary mt-2">Zone observée : {result.affectedArea}</p>
               <div className="glass-panel rounded-xl p-4 mt-4"><p className="text-sm text-body leading-relaxed">{result.explanation}</p></div>
-              <div className="glass-panel rounded-xl p-4 mt-4"><p className="text-xs font-bold text-gold">VALIDATION TERRAIN</p><div className="flex gap-2 mt-3"><button onClick={()=>validate('confirmed')} className="glass-panel neon-border-green px-3 py-2 rounded-lg text-xs text-gold">Oui</button><button onClick={()=>validate('rejected')} className="glass-panel neon-border-amber px-3 py-2 rounded-lg text-xs text-gold">Non</button><button onClick={()=>validate('uncertain')} className="glass-panel neon-border-cyan px-3 py-2 rounded-lg text-xs text-gold">Incertain</button></div>{validation&&<p className="text-xs text-neon-green mt-2">✓ Enregistré : {validation}</p>}</div>
+              <div className="glass-panel rounded-xl p-4 mt-4"><p className="text-xs font-bold text-gold">VALIDATION TERRAIN</p><input value={actualDisease} onChange={e => setActualDisease(e.target.value)} placeholder="Diagnostic terrain de référence (optionnel)" className="cyber-input w-full rounded-xl px-3 py-2 mt-2 text-xs" /><p className="text-[10px] text-body-secondary mt-1">Pour calculer les métriques scientifiques, renseignez le diagnostic confirmé par le terrain ou un expert.</p><div className="flex gap-2 mt-3"><button onClick={()=>validate('confirmed')} className="glass-panel neon-border-green px-3 py-2 rounded-lg text-xs text-gold">Oui</button><button onClick={()=>validate('rejected')} className="glass-panel neon-border-amber px-3 py-2 rounded-lg text-xs text-gold">Non</button><button onClick={()=>validate('uncertain')} className="glass-panel neon-border-cyan px-3 py-2 rounded-lg text-xs text-gold">Incertain</button></div>{validation&&<p className="text-xs text-neon-green mt-2">✓ Enregistré : {validation}</p>}</div>
               <div className="grid grid-cols-2 gap-2 mt-4">{(['treatments','bio','precautions','prevention'] as const).map(key => <button key={key} onClick={() => setShowDetail(key)} className="glass-panel neon-border-cyan text-gold rounded-xl py-3 px-3 text-xs font-bold">{key === 'treatments' ? '💊 Mesures' : key === 'bio' ? '🌿 Biocontrôle' : key === 'precautions' ? '⚠️ Précautions' : '🛡️ Prévention'}</button>)}</div>
             </div>
             <button onClick={resetScan} className="glass-panel neon-border-cyan text-gold w-full mt-4 rounded-xl py-4 font-bold">↻ Nouveau scan</button>

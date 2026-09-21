@@ -95,12 +95,19 @@ export async function loadResearchStats(): Promise<ResearchStats> {
   const confusionMatrix = labels.flatMap(actual => labels.map(predicted => ({
     actual, predicted, count: referenceRows.filter(r => r.actual_disease === actual && r.predicted_disease === predicted).length
   }))).filter(x => x.count > 0);
-  const tp = labels.reduce((sum, label) => sum + referenceRows.filter(r => r.actual_disease === label && r.predicted_disease === label).length, 0);
-  const fp = labels.reduce((sum, label) => sum + referenceRows.filter(r => r.actual_disease !== label && r.predicted_disease === label).length, 0);
-  const fn = labels.reduce((sum, label) => sum + referenceRows.filter(r => r.actual_disease === label && r.predicted_disease !== label).length, 0);
-  const precision = tp + fp ? tp / (tp + fp) : 0;
-  const recall = tp + fn ? tp / (tp + fn) : 0;
-  const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
+  const accuracy = referenceRows.length ? referenceRows.filter(r => r.actual_disease === r.predicted_disease).length / referenceRows.length : 0;
+  const classScores = labels.map(label => {
+    const tp = referenceRows.filter(r => r.actual_disease === label && r.predicted_disease === label).length;
+    const fp = referenceRows.filter(r => r.actual_disease !== label && r.predicted_disease === label).length;
+    const fn = referenceRows.filter(r => r.actual_disease === label && r.predicted_disease !== label).length;
+    const precision = tp + fp ? tp / (tp + fp) : 0;
+    const recall = tp + fn ? tp / (tp + fn) : 0;
+    const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
+    return { precision, recall, f1 };
+  });
+  const precision = classScores.length ? classScores.reduce((s,x)=>s+x.precision,0)/classScores.length : 0;
+  const recall = classScores.length ? classScores.reduce((s,x)=>s+x.recall,0)/classScores.length : 0;
+  const f1 = classScores.length ? classScores.reduce((s,x)=>s+x.f1,0)/classScores.length : 0;
   return {
     totalCases: rows.length,
     confirmed,
@@ -141,7 +148,7 @@ export async function exportResearchData(format: 'csv'|'json') {
   if (error) throw error;
   const rows = data ?? [];
   if (format === 'json') return JSON.stringify(rows, null, 2);
-  const keys = ['id','created_at','crop','location','latitude','longitude','predicted_disease','confidence','validation_label','field_outcome','weather'];
+  const keys = ['id','created_at','crop','location','latitude','longitude','predicted_disease','confidence','validation_label','actual_disease','field_outcome','weather'];
   const esc = (v: unknown) => {
     const s = typeof v === 'string' ? v : JSON.stringify(v ?? '');
     return '"' + s.replaceAll('"','""') + '"';

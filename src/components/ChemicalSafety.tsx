@@ -10,7 +10,8 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
   const [selectedProduct, setSelectedProduct] = useState<ChemicalProduct | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [dataSource, setDataSource] = useState<'local' | 'ai' | null>(null);
-  const [allProducts] = useState<ChemicalProduct[]>(getAllLocalProducts());\n  const localPesticideCount = getLocalPesticideCount();
+  const [allProducts] = useState<ChemicalProduct[]>(getAllLocalProducts());
+  const localPesticideCount = getLocalPesticideCount();
 
   const INITIAL_VISIBLE_COUNT = isDesktop ? 12 : 8;
   const LOAD_MORE_COUNT = isDesktop ? 12 : 8;

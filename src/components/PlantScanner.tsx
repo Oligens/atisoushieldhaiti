@@ -12,7 +12,6 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
   const [validation, setValidation] = useState<ValidationLabel | null>(null);
-  const [validation, setValidation] = useState<ValidationLabel | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 

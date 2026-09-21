@@ -1,5 +1,3 @@
-declare const process: { env: Record<string, string | undefined> };
-
 type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
 function json(res: any, status: number, body: unknown) {
@@ -9,10 +7,16 @@ function json(res: any, status: number, body: unknown) {
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Méthode non autorisée.' });
 
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  const env = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+  const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_API_KEY;
   if (!apiKey) return json(res, 500, { error: 'Clé IA absente côté serveur. Configurez GEMINI_API_KEY dans Vercel.' });
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  let body: any;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  } catch {
+    return json(res, 400, { error: 'Corps JSON invalide.' });
+  }
   const mode = body?.mode === 'vision' ? 'vision' : 'chat';
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const imageData = typeof body?.imageData === 'string' ? body.imageData : '';
@@ -22,23 +26,31 @@ export default async function handler(req: any, res: any) {
   if (mode === 'vision' && !imageData) return json(res, 400, { error: 'Image requise pour le diagnostic.' });
   if (imageData.length > 8_000_000) return json(res, 413, { error: 'Image trop volumineuse. Réduisez la taille à moins de 6 Mo.' });
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
   const parts: GeminiPart[] = [{ text: prompt }];
   if (mode === 'vision') {
     parts.push({ inline_data: { mime_type: mimeType, data: imageData.replace(/^data:[^;]+;base64,/, '') } });
   }
 
-  const response = await fetch(
+  const generationConfig: { temperature: number; responseMimeType?: string } = { temperature: 0.2 };
+  if (mode === 'vision') generationConfig.responseMimeType = 'application/json';
+
+  let response: Response;
+  try {
+    response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+        generationConfig,
       }),
     },
   );
+  } catch {
+    return json(res, 502, { error: 'Erreur réseau avec le fournisseur IA.' });
+  }
 
   const payload = await response.json();
   if (!response.ok) {

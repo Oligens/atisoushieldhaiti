@@ -10,9 +10,12 @@ export interface AgriculturalCase {
   predicted_disease: string;
   confidence: number;
   validation_label?: 'confirmed' | 'rejected' | 'uncertain' | null;
+  actual_disease?: string | null;
   weather?: Record<string, unknown> | null;
   field_outcome?: string | null;
 }
+
+export interface ModelMetrics { accuracy: number; precision: number; recall: number; f1: number; evaluatedCases: number; confusionMatrix: { actual: string; predicted: string; count: number }[]; }
 
 export interface ResearchStats {
   totalCases: number;
@@ -24,6 +27,7 @@ export interface ResearchStats {
   byCrop: { label: string; value: number }[];
   byDisease: { label: string; value: number }[];
   byLocation: { label: string; value: number }[];
+  metrics: ModelMetrics;
 }
 
 export async function saveAgriculturalCase(input: Omit<AgriculturalCase, 'id' | 'created_at'>) {
@@ -33,11 +37,12 @@ export async function saveAgriculturalCase(input: Omit<AgriculturalCase, 'id' | 
   return data as AgriculturalCase;
 }
 
-export async function updateCaseValidation(id: string, label: AgriculturalCase['validation_label'], fieldOutcome?: string) {
+export async function updateCaseValidation(id: string, label: AgriculturalCase['validation_label'], fieldOutcome?: string, actualDisease?: string) {
   if (!supabase) throw new Error('Supabase non configuré.');
   const { data, error } = await supabase.from('agricultural_cases').update({
     validation_label: label,
     field_outcome: fieldOutcome ?? null,
+    actual_disease: actualDisease?.trim() || null,
     validated_at: new Date().toISOString()
   }).eq('id', id).select().single();
   if (error) throw error;
@@ -60,7 +65,7 @@ export async function saveWeatherObservation(input: {
 
 export async function loadResearchStats(): Promise<ResearchStats> {
   if (!supabase) throw new Error('Supabase non configuré. Ajoutez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.');
-  const { data, error } = await supabase.from('agricultural_cases').select('crop,location,predicted_disease,confidence,validation_label');
+  const { data, error } = await supabase.from('agricultural_cases').select('crop,location,predicted_disease,confidence,validation_label,actual_disease');
   if (error) throw error;
   const rows = (data ?? []) as Pick<AgriculturalCase, 'crop'|'location'|'predicted_disease'|'confidence'|'validation_label'>[];
   const count = (key: keyof typeof rows[number]) => {
@@ -75,6 +80,20 @@ export async function loadResearchStats(): Promise<ResearchStats> {
   const rejected = rows.filter(r=>r.validation_label==='rejected').length;
   const uncertain = rows.filter(r=>r.validation_label==='uncertain').length;
   const validated = confirmed + rejected;
+  const evaluated = rows.filter(r => r.validation_label === 'confirmed' || r.validation_label === 'rejected');
+  const correct = evaluated.filter(r => r.validation_label === 'confirmed').length;
+  const accuracy = evaluated.length ? correct / evaluated.length : 0;
+  const referenceRows = rows.filter(r => !!r.actual_disease && (r.validation_label === 'confirmed' || r.validation_label === 'rejected'));
+  const labels = [...new Set(referenceRows.flatMap(r => [r.predicted_disease, r.actual_disease as string]))];
+  const confusionMatrix = labels.flatMap(actual => labels.map(predicted => ({
+    actual, predicted, count: referenceRows.filter(r => r.actual_disease === actual && r.predicted_disease === predicted).length
+  }))).filter(x => x.count > 0);
+  const tp = labels.reduce((sum, label) => sum + referenceRows.filter(r => r.actual_disease === label && r.predicted_disease === label).length, 0);
+  const fp = labels.reduce((sum, label) => sum + referenceRows.filter(r => r.actual_disease !== label && r.predicted_disease === label).length, 0);
+  const fn = labels.reduce((sum, label) => sum + referenceRows.filter(r => r.actual_disease === label && r.predicted_disease !== label).length, 0);
+  const precision = tp + fp ? tp / (tp + fp) : 0;
+  const recall = tp + fn ? tp / (tp + fn) : 0;
+  const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
   return {
     totalCases: rows.length,
     confirmed,
@@ -84,7 +103,8 @@ export async function loadResearchStats(): Promise<ResearchStats> {
     averageConfidence: rows.length ? Math.round(rows.reduce((s,r)=>s + Number(r.confidence || 0),0) / rows.length) : 0,
     byCrop: count('crop'),
     byDisease: count('predicted_disease'),
-    byLocation: count('location')
+    byLocation: count('location'),
+    metrics: { accuracy, precision, recall, f1, evaluatedCases: referenceRows.length, confusionMatrix }
   };
 }
 

@@ -9,6 +9,7 @@ interface SidebarProps {
 const navItems: { id: Screen; icon: string; label: string }[] = [
   { id: 'dashboard', icon: 'fa-house', label: 'Tableau de bord' },
   { id: 'location', icon: 'fa-map-location-dot', label: 'Analyse de lieu' },
+  { id: 'research', icon: 'fa-flask', label: 'Mode Recherche' },
   { id: 'assistant', icon: 'fa-comments', label: 'Assistant IA' },
   { id: 'scanner', icon: 'fa-camera', label: 'Scanner' },
   { id: 'safety', icon: 'fa-shield-halved', label: 'Guide biopesticides' },

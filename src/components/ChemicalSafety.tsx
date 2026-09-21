@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { searchProduct, getAllLocalProducts, type ChemicalProduct } from '../services/chemicalSearch';
+import { searchProduct, getAllPesticides, type ChemicalProduct } from '../services/chemicalSearch';
 
 interface ChemicalSafetyProps {
   isDesktop: boolean;
@@ -10,16 +10,11 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
   const [selectedProduct, setSelectedProduct] = useState<ChemicalProduct | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [dataSource, setDataSource] = useState<'local' | 'ai' | null>(null);
-  const [allProducts] = useState<ChemicalProduct[]>(getAllLocalProducts());
-
-  const [searchResults, setSearchResults] = useState<ChemicalProduct[]>([]);
-  const [suggestions, setSuggestions] = useState<ChemicalProduct[]>([]);
+  const [allProducts] = useState<ChemicalProduct[]>(getAllPesticides());
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
       setSelectedProduct(null);
-      setSearchResults([]);
-      setSuggestions([]);
       setDataSource(null);
       return;
     }
@@ -27,16 +22,8 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
     setIsLoading(true);
     try {
       const result = await searchProduct(query);
-      setSearchResults(result.products);
-      setSuggestions(result.suggestions);
+      setSelectedProduct(result.product);
       setDataSource(result.source);
-      
-      // Si un seul résultat exact, l'afficher directement
-      if (result.products.length === 1) {
-        setSelectedProduct(result.products[0]);
-      } else {
-        setSelectedProduct(null);
-      }
     } catch (error) {
       console.error('Erreur lors de la recherche:', error);
     } finally {
@@ -50,8 +37,6 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
       handleSearch(value);
     } else {
       setSelectedProduct(null);
-      setSearchResults([]);
-      setSuggestions([]);
       setDataSource(null);
     }
   };
@@ -107,112 +92,12 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
       </div>
 
       {/* Indicateur de source */}
-      {dataSource && (
+      {dataSource && selectedProduct && (
         <div className="mb-4 glass-panel rounded-xl px-4 py-2 inline-flex items-center gap-2">
           <i className={`fa-solid ${dataSource === 'local' ? 'fa-database' : 'fa-robot'} icon-gold`}></i>
           <span className="text-xs text-body">
-            Source : {dataSource === 'local' ? 'Base de données locale (1200+ pesticides)' : 'Suggestions IA'}
+            Source : {dataSource === 'local' ? 'Base de données locale' : 'IA / API Open Source'}
           </span>
-        </div>
-      )}
-
-      {/* Résultats de recherche multiples */}
-      {searchResults.length > 1 && !selectedProduct && (
-        <div className="mb-6">
-          <h3 className="text-lg font-bold text-body mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-list icon-gold"></i>
-            <span className="gradient-text">RÉSULTATS ({searchResults.length})</span>
-          </h3>
-          <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
-            {searchResults.slice(0, 12).map((product) => (
-              <button
-                key={product.id}
-                onClick={() => setSelectedProduct(product)}
-                className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
-                    <span className="text-2xl">
-                      {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-bold text-body">{product.name}</h3>
-                    <p className="text-xs text-body-secondary">{product.type}</p>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${toxicityColors[product.toxicity].bg} ${toxicityColors[product.toxicity].text}`}>
-                    {toxicityColors[product.toxicity].label}
-                  </span>
-                </div>
-                <div className="w-full bg-cyber-bg-deep rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${
-                      product.toxicity === 'high'
-                        ? 'bg-neon-red'
-                        : product.toxicity === 'medium'
-                        ? 'bg-neon-amber'
-                        : 'bg-neon-green'
-                    }`}
-                    style={{ width: `${product.toxicityScore}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Suggestions IA */}
-      {suggestions.length > 0 && !selectedProduct && (
-        <div className="mb-6">
-          <div className="glass-panel neon-border-amber rounded-2xl p-6 mb-4">
-            <h3 className="text-lg font-bold text-body mb-2 flex items-center gap-2">
-              <i className="fa-solid fa-robot icon-gold"></i>
-              <span className="text-gold text-glow-amber">PRODUIT NON TROUVÉ</span>
-            </h3>
-            <p className="text-sm text-body-secondary mb-4">
-              Le pesticide "{searchQuery}" n'a pas été trouvé dans notre base de données. Voici des suggestions similaires :
-            </p>
-          </div>
-          <h3 className="text-lg font-bold text-body mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-lightbulb icon-gold"></i>
-            <span className="gradient-text">SUGGESTIONS</span>
-          </h3>
-          <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
-            {suggestions.map((product) => (
-              <button
-                key={product.id}
-                onClick={() => setSelectedProduct(product)}
-                className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
-                    <span className="text-2xl">
-                      {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-bold text-body">{product.name}</h3>
-                    <p className="text-xs text-body-secondary">{product.type}</p>
-                  </div>
-                </div>
-                <div className="w-full bg-cyber-bg-deep rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${
-                      product.toxicity === 'high'
-                        ? 'bg-neon-red'
-                        : product.toxicity === 'medium'
-                        ? 'bg-neon-amber'
-                        : 'bg-neon-green'
-                    }`}
-                    style={{ width: `${product.toxicityScore}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
-              </button>
-            ))}
-          </div>
         </div>
       )}
 
@@ -330,59 +215,50 @@ export default function ChemicalSafety({ isDesktop }: ChemicalSafetyProps) {
             </div>
           </div>
         </div>
-      ) : searchResults.length === 0 && suggestions.length === 0 ? (
-        /* Liste des produits par défaut */
-        <div>
-          <h3 className="text-lg font-bold text-body mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-database icon-gold"></i>
-            <span className="gradient-text">BASE DE DONNÉES (1200+ PESTICIDES)</span>
-          </h3>
-          <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-4 gap-4' : 'space-y-3'}>
-            {allProducts.slice(0, 20).map((product) => (
-              <button
-                key={product.id}
-                onClick={() => {
-                  setSelectedProduct(product);
-                  setSearchQuery(product.name);
-                  setDataSource('local');
-                }}
-                className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
-                    <span className="text-2xl">
-                      {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-bold text-body">{product.name}</h3>
-                    <p className="text-xs text-body-secondary">{product.type}</p>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${toxicityColors[product.toxicity].bg} ${toxicityColors[product.toxicity].text}`}>
-                    {toxicityColors[product.toxicity].label}
+      ) : (
+        /* Liste des produits */
+        <div className={isDesktop ? 'grid grid-cols-2 lg:grid-cols-4 gap-4' : 'space-y-3'}>
+          {allProducts.map((product) => (
+            <button
+              key={product.id}
+              onClick={() => {
+                setSelectedProduct(product);
+                setSearchQuery(product.name);
+                setDataSource('local');
+              }}
+              className="glass-panel rounded-2xl p-5 text-left hover:glass-panel-hover card-hover"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${toxicityColors[product.toxicity].bg}`}>
+                  <span className="text-2xl">
+                    {product.toxicity === 'high' ? '☠️' : product.toxicity === 'medium' ? '⚠️' : '🟢'}
                   </span>
                 </div>
-                <div className="w-full bg-cyber-bg-deep rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${
-                      product.toxicity === 'high'
-                        ? 'bg-neon-red'
-                        : product.toxicity === 'medium'
-                        ? 'bg-neon-amber'
-                        : 'bg-neon-green'
-                    }`}
-                    style={{ width: `${product.toxicityScore}%` }}
-                  ></div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-body">{product.name}</h3>
+                  <p className="text-xs text-body-secondary">{product.type}</p>
                 </div>
-                <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-body-secondary mt-4 text-center">
-            Affichage des 20 premiers résultats sur 1200+ pesticides disponibles
-          </p>
+                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${toxicityColors[product.toxicity].bg} ${toxicityColors[product.toxicity].text}`}>
+                  {toxicityColors[product.toxicity].label}
+                </span>
+              </div>
+              <div className="w-full bg-cyber-bg-deep rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${
+                    product.toxicity === 'high'
+                      ? 'bg-neon-red'
+                      : product.toxicity === 'medium'
+                      ? 'bg-neon-amber'
+                      : 'bg-neon-green'
+                  }`}
+                  style={{ width: `${product.toxicityScore}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-body-secondary mt-2">Toxicité : {product.toxicityScore}/100</p>
+            </button>
+          ))}
         </div>
-      ) : null}
+      )}
 
       {/* Engagement */}
       {!selectedProduct && (

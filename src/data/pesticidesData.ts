@@ -1,13 +1,13 @@
 /**
- * Base de données locale étendue de pesticides
- * Contient 100+ pesticides réels + système de génération pour atteindre 1200+
+ * Base de données locale des pesticides
+ * Structure extensible pour 1200+ entrées
  */
 
 export interface Pesticide {
   id: string;
   nom: string;
-  type: 'Herbicide' | 'Insecticide' | 'Fongicide' | 'Acaricide' | 'Nematicide';
-  scoreToxicite: number;
+  type: 'Herbicide' | 'Insecticide' | 'Fongicide' | 'Acaricide' | 'Nématicide' | 'Régulateur';
+  scoreToxicite: number; // 0-100
   niveauRisque: 'Faible' | 'Modéré' | 'Élevé';
   impactChaineAlimentaire: string;
   impactOrganes: string[];
@@ -15,135 +15,493 @@ export interface Pesticide {
   precautionsStrictes: string[];
 }
 
-// Base de données principale (100+ pesticides réels)
+/**
+ * Normalise une chaîne pour la recherche (insensible à la casse et aux accents)
+ */
+function normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
+    .trim();
+}
+
+/**
+ * Base de données étendue de pesticides
+ * Échantillon représentatif couvrant toutes les catégories
+ */
 export const pesticidesDatabase: Pesticide[] = [
-  // HERBICIDES (30+)
-  { id: 'h1', nom: 'Glyphosate', type: 'Herbicide', scoreToxicite: 85, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Contamination des sols et nappes phréatiques. Résidus détectés dans les cultures vivrières.', impactOrganes: ['Foie — Stéatose hépatique', 'Reins — Toxicité rénale chronique', 'Système nerveux — Neurotoxicité potentielle'], equivalentsBiologiques: ['Paillage organique', 'Désherbage manuel', 'Vinaigre horticole 20%', 'Couverture végétale'], precautionsStrictes: ['Interdit en zone résidentielle', 'Délai 30 jours avant plantation', 'Porter EPP complet'] },
-  { id: 'h2', nom: 'Paraquat', type: 'Herbicide', scoreToxicite: 95, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Extrêmement toxique. Pas d\'antidote. Interdit dans 60+ pays.', impactOrganes: ['Foie — Nécrose hépatique aiguë', 'Reins — Insuffisance rénale fatale', 'Poumons — Fibrose pulmonaire irréversible'], equivalentsBiologiques: ['Désherbage mécanique', 'Paillage épais', 'Solarisation du sol'], precautionsStrictes: ['Interdit dans la plupart des pays', 'Toxicité mortelle même à faible dose', 'Aucun antidote disponible'] },
-  { id: 'h3', nom: 'Atrazine', type: 'Herbicide', scoreToxicite: 72, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Contamination majeure des eaux souterraines. Perturbateur endocrinien.', impactOrganes: ['Système endocrinien — Perturbation hormonale', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Rotation culturale', 'Paillage', 'Désherbage mécanique'], precautionsStrictes: ['Interdit dans l\'UE depuis 2004', 'Contamination persistante des nappes', 'Effets à long terme sur la reproduction'] },
-  { id: 'h4', nom: '2,4-D', type: 'Herbicide', scoreToxicite: 65, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Résidus dans les cultures. Contamination des sols.', impactOrganes: ['Foie — Métabolisation hépatique', 'Reins — Élimination rénale', 'Système nerveux — Neurotoxicité modérée'], equivalentsBiologiques: ['Désherbage manuel', 'Paillage organique', 'Rotation culturale'], precautionsStrictes: ['Éviter la dérive vers les cultures sensibles', 'Porter des gants et masque', 'Délai de 14 jours avant récolte'] },
-  { id: 'h5', nom: 'Dicamba', type: 'Herbicide', scoreToxicite: 58, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Dérive importante. Contamination des cultures voisines.', impactOrganes: ['Foie — Hépatotoxicité', 'Reins — Néphrotoxicité', 'Yeux — Irritation sévère'], equivalentsBiologiques: ['Désherbage mécanique', 'Paillage', 'Couverture végétale'], precautionsStrictes: ['Risque élevé de dérive', 'Ne pas appliquer par vent fort', 'Distance de sécurité requise'] },
-  { id: 'h6', nom: 'Glufosinate', type: 'Herbicide', scoreToxicite: 70, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Résidus dans les sols et eaux. Toxicité aiguë élevée.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Désherbage manuel', 'Paillage épais', 'Solarisation'], precautionsStrictes: ['Toxique pour les organismes aquatiques', 'Porter EPP complet', 'Éviter le contact avec la peau'] },
-  { id: 'h7', nom: 'Pendiméthaline', type: 'Herbicide', scoreToxicite: 45, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Persistant dans les sols. Contamination à long terme.', impactOrganes: ['Foie — Hépatotoxicité modérée', 'Thyroïde — Perturbation possible'], equivalentsBiologiques: ['Paillage', 'Désherbage mécanique précoce', 'Rotation culturale'], precautionsStrictes: ['Appliquer avant levée des cultures', 'Éviter le contact avec la peau', 'Respecter les doses'] },
-  { id: 'h8', nom: 'Métolachlore', type: 'Herbicide', scoreToxicite: 42, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Contamination des eaux de surface. Persistant.', impactOrganes: ['Foie — Métabolisation hépatique', 'Yeux — Irritation'], equivalentsBiologiques: ['Paillage organique', 'Désherbage mécanique', 'Couverture végétale'], precautionsStrictes: ['Appliquer avant levée', 'Éviter la contamination des eaux', 'Porter des gants'] },
-  { id: 'h9', nom: 'Alachlore', type: 'Herbicide', scoreToxicite: 68, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Cancérogène probable. Contamination des eaux.', impactOrganes: ['Foie — Hépatotoxicité sévère', 'Système reproducteur — Toxicité', 'Cancérogène probable'], equivalentsBiologiques: ['Rotation culturale', 'Paillage', 'Désherbage manuel'], precautionsStrictes: ['Cancérogène suspecté', 'Interdit dans plusieurs pays', 'Éviter tout contact'] },
-  { id: 'h10', nom: 'Butachlore', type: 'Herbicide', scoreToxicite: 48, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Utilisé en riziculture. Contamination des eaux.', impactOrganes: ['Foie — Hépatotoxicité modérée', 'Reins — Néphrotoxicité légère'], equivalentsBiologiques: ['Désherbage manuel en rizière', 'Paillage', 'Rotation culturale'], precautionsStrictes: ['Appliquer en conditions contrôlées', 'Éviter la contamination des eaux', 'Porter EPP'] },
+  // ===== HERBICIDES =====
+  {
+    id: 'h001',
+    nom: 'Glyphosate',
+    type: 'Herbicide',
+    scoreToxicite: 85,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Contamination des sols et nappes phréatiques. Résidus détectés dans les cultures vivrières.',
+    impactOrganes: ['Foie — Stéatose hépatique', 'Reins — Toxicité rénale chronique', 'Système nerveux — Neurotoxicité potentielle'],
+    equivalentsBiologiques: ['Paillage organique', 'Désherbage manuel', 'Vinaigre horticole 20%', 'Couverture végétale'],
+    precautionsStrictes: ['Interdit en zone résidentielle', 'Délai 30 jours', 'EPP complet obligatoire'],
+  },
+  {
+    id: 'h002',
+    nom: 'Atrazine',
+    type: 'Herbicide',
+    scoreToxicite: 78,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Persistant dans les sols. Contamination des eaux souterraines.',
+    impactOrganes: ['Foie — Hépatotoxicité', 'Reins — Néphrotoxicité', 'Système endocrinien — Perturbateur'],
+    equivalentsBiologiques: ['Rotation culturale', 'Paillage', 'Binage mécanique', 'Plantes couvre-sol'],
+    precautionsStrictes: ['Interdit dans l\'UE', 'Très persistant', 'Protection des eaux obligatoire'],
+  },
+  {
+    id: 'h003',
+    nom: '2,4-D',
+    type: 'Herbicide',
+    scoreToxicite: 72,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Dérive possible sur cultures voisines. Résidus dans les aliments.',
+    impactOrganes: ['Foie — Métabolisation hépatique', 'Reins — Élimination rénale', 'Thyroïde — Perturbation'],
+    equivalentsBiologiques: ['Sélection variétale', 'Rotation culturale', 'Désherbage thermique', 'Paillage'],
+    precautionsStrictes: ['Attention à la dérive', 'Ne pas utiliser près des cours d\'eau', 'EPP recommandé'],
+  },
+  {
+    id: 'h004',
+    nom: 'Paraquat',
+    type: 'Herbicide',
+    scoreToxicite: 95,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Extrêmement toxique. Pas d\'antidote. Interdit dans 60+ pays.',
+    impactOrganes: ['Foie — Nécrose hépatique aiguë', 'Reins — Insuffisance rénale fatale', 'Poumons — Fibrose irréversible'],
+    equivalentsBiologiques: ['Paillage organique', 'Désherbage manuel', 'Couverture végétale', 'Solarisation'],
+    precautionsStrictes: ['INTERDIT dans de nombreux pays', 'Mortel en cas d\'ingestion', 'Aucun antidote disponible'],
+  },
+  {
+    id: 'h005',
+    nom: 'Glufosinate',
+    type: 'Herbicide',
+    scoreToxicite: 68,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Moins persistant que le glyphosate. Résidus modérés.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Système nerveux — Effets modérés'],
+    equivalentsBiologiques: ['Paillage', 'Rotation culturale', 'Binage', 'Plantes compagnes'],
+    precautionsStrictes: ['Délai de carence 14 jours', 'Protection des eaux', 'EPP recommandé'],
+  },
+  {
+    id: 'h006',
+    nom: 'Dicamba',
+    type: 'Herbicide',
+    scoreToxicite: 65,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Dérive très importante. Contamination des cultures voisines.',
+    impactOrganes: ['Foie — Hépatotoxicité modérée', 'Reins — Néphrotoxicité', 'Yeux — Irritation sévère'],
+    equivalentsBiologiques: ['Rotation culturale', 'Paillage épais', 'Désherbage mécanique', 'Couverture végétale'],
+    precautionsStrictes: ['Risque élevé de dérive', 'Ne pas utiliser par vent', 'Distance de sécurité'],
+  },
+  {
+    id: 'h007',
+    nom: 'Pendiméthaline',
+    type: 'Herbicide',
+    scoreToxicite: 55,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Persistant dans le sol. Accumulation possible.',
+    impactOrganes: ['Foie — Métabolisation', 'Thyroïde — Perturbation potentielle', 'Peau — Irritation'],
+    equivalentsBiologiques: ['Paillage', 'Binage précoce', 'Rotation culturale', 'Solarisation'],
+    precautionsStrictes: ['Application pré-levée', 'Incorporation dans le sol', 'Protection des eaux'],
+  },
+  {
+    id: 'h008',
+    nom: 'Métolachlore',
+    type: 'Herbicide',
+    scoreToxicite: 48,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Dégradation relativement rapide. Résidus modérés.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Peau — Irritation légère'],
+    equivalentsBiologiques: ['Paillage organique', 'Rotation culturale', 'Binage', 'Plantes couvre-sol'],
+    precautionsStrictes: ['Application pré-levée', 'Respecter les doses', 'Protection des eaux'],
+  },
+  {
+    id: 'h009',
+    nom: 'Acétochlore',
+    type: 'Herbicide',
+    scoreToxicite: 62,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Classé cancérigène probable. Contamination des sols.',
+    impactOrganes: ['Foie — Hépatotoxicité', 'Reins — Néphrotoxicité', 'Système reproducteur — Effets potentiels'],
+    equivalentsBiologiques: ['Paillage', 'Rotation culturale', 'Désherbage mécanique', 'Couverture végétale'],
+    precautionsStrictes: ['Cancérigène probable', 'EPP obligatoire', 'Distance de sécurité'],
+  },
+  {
+    id: 'h010',
+    nom: 'Bentazone',
+    type: 'Herbicide',
+    scoreToxicite: 42,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Dégradation rapide. Faible accumulation.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Yeux — Irritation modérée'],
+    equivalentsBiologiques: ['Paillage', 'Binage', 'Rotation culturale', 'Plantes compagnes'],
+    precautionsStrictes: ['Application post-levée', 'Respecter les doses', 'Protection des eaux'],
+  },
 
-  // INSECTICIDES (35+)
-  { id: 'i1', nom: 'Chlorpyrifos', type: 'Insecticide', scoreToxicite: 92, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Bioaccumulation dans la chaîne alimentaire. Résidus persistants.', impactOrganes: ['Foie — Hépatotoxicité sévère', 'Reins — Insuffisance rénale aiguë', 'Cerveau — Neurodéveloppement (enfants)'], equivalentsBiologiques: ['Extrait de neem', 'Bacillus thuringiensis', 'Pièges à phéromones', 'Lâchers de coccinelles'], precautionsStrictes: ['Interdit UE depuis 2020', 'Classé très toxique OMS', 'Effets irréversibles sur le système nerveux'] },
-  { id: 'i2', nom: 'Imidaclopride', type: 'Insecticide', scoreToxicite: 58, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Toxique pour les pollinisateurs. Contamination du nectar.', impactOrganes: ['Foie — Métabolisation hépatique', 'Reins — Élimination rénale', 'Système endocrinien — Perturbateur suspecté'], equivalentsBiologiques: ['Savon insecticide', 'Huile de menthe poivrée', 'Terre de diatomée', 'Plantes compagnes'], precautionsStrictes: ['Ne pas traiter en floraison', 'Toxique pour les abeilles', 'Délai 21 jours avant récolte'] },
-  { id: 'i3', nom: 'Thiaméthoxame', type: 'Insecticide', scoreToxicite: 55, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Néonicotinoïde. Toxique pour les pollinisateurs.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité modérée', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Bacillus thuringiensis', 'Savon noir', 'Pièges chromatiques', 'Prédateurs naturels'], precautionsStrictes: ['Interdit sur certaines cultures', 'Toxique pour les abeilles', 'Éviter la dérive'] },
-  { id: 'i4', nom: 'Cyperméthrine', type: 'Insecticide', scoreToxicite: 62, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Pyrethrinoïde de synthèse. Persistant dans l\'environnement.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité', 'Peau — Irritation et sensibilisation'], equivalentsBiologiques: ['Pyèthre naturel', 'Neem', 'Bacillus thuringiensis', 'Pièges lumineux'], precautionsStrictes: ['Très toxique pour les poissons', 'Porter EPP complet', 'Éviter le contact avec la peau'] },
-  { id: 'i5', nom: 'Deltaméthrine', type: 'Insecticide', scoreToxicite: 60, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Pyrethrinoïde. Toxique pour les organismes aquatiques.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Métabolisation hépatique', 'Peau — Irritation'], equivalentsBiologiques: ['Pyèthre naturel', 'Neem', 'Bacillus thuringiensis', 'Roténone'], precautionsStrictes: ['Extrêmement toxique pour les poissons', 'Porter gants et masque', 'Ne pas contaminer les cours d\'eau'] },
-  { id: 'i6', nom: 'Malathion', type: 'Insecticide', scoreToxicite: 68, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Organophosphoré. Contamination des sols et eaux.', impactOrganes: ['Système nerveux — Inhibition cholinestérase', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Neem', 'Bacillus thuringiensis', 'Savon insecticide', 'Pièges à phéromones'], precautionsStrictes: ['Inhibition de la cholinestérase', 'Porter EPP complet', 'Antidote : atropine nécessaire'] },
-  { id: 'i7', nom: 'Parathion', type: 'Insecticide', scoreToxicite: 90, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Extrêmement toxique. Interdit dans la plupart des pays.', impactOrganes: ['Système nerveux — Toxicité aiguë sévère', 'Foie — Hépatotoxicité sévère', 'Reins — Insuffisance rénale'], equivalentsBiologiques: ['Méthodes biologiques uniquement', 'Prédateurs naturels', 'Rotation culturale'], precautionsStrictes: ['Interdit dans la plupart des pays', 'Toxicité mortelle', 'Aucune utilisation recommandée'] },
-  { id: 'i8', nom: 'Diméthoate', type: 'Insecticide', scoreToxicite: 72, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Organophosphoré systémique. Contamination des plantes.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Neem', 'Bacillus thuringiensis', 'Savon noir', 'Huiles horticoles'], precautionsStrictes: ['Systémique - pénètre dans la plante', 'Porter EPP complet', 'Délai de carence strict'] },
-  { id: 'i9', nom: 'Abamectine', type: 'Insecticide', scoreToxicite: 52, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Origine naturelle mais synthèse chimique. Toxique pour les organismes du sol.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité modérée', 'Yeux — Irritation sévère'], equivalentsBiologiques: ['Bacillus thuringiensis', 'Neem', 'Prédateurs naturels', 'Pièges chromatiques'], precautionsStrictes: ['Toxique pour les abeilles', 'Éviter le contact avec les yeux', 'Porter des lunettes de protection'] },
-  { id: 'i10', nom: 'Spinosad', type: 'Insecticide', scoreToxicite: 35, niveauRisque: 'Faible', impactChaineAlimentaire: 'Origine naturelle (bactérie). Moins persistant.', impactOrganes: ['Système nerveux — Toxicité faible', 'Peau — Irritation légère'], equivalentsBiologiques: ['Bacillus thuringiensis', 'Neem', 'Savon insecticide', 'Prédateurs naturels'], precautionsStrictes: ['Accepté en agriculture biologique', 'Toxique pour les abeilles en traitement direct', 'Appliquer le soir'] },
-  { id: 'i11', nom: 'Lambda-cyhalothrine', type: 'Insecticide', scoreToxicite: 65, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Pyrethrinoïde. Très toxique pour les organismes aquatiques.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité', 'Peau — Irritation'], equivalentsBiologiques: ['Pyèthre naturel', 'Neem', 'Bacillus thuringiensis', 'Pièges lumineux'], precautionsStrictes: ['Extrêmement toxique pour les poissons', 'Porter EPP complet', 'Ne pas contaminer les eaux'] },
-  { id: 'i12', nom: 'Perméthrine', type: 'Insecticide', scoreToxicite: 58, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Pyrethrinoïde. Persistant sur les surfaces.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité modérée', 'Peau — Irritation et paresthésie'], equivalentsBiologiques: ['Pyèthre naturel', 'Neem', 'Bacillus thuringiensis', 'Huiles essentielles'], precautionsStrictes: ['Irritant cutané', 'Porter des gants', 'Éviter l\'inhalation'] },
-  { id: 'i13', nom: 'Carbosulfan', type: 'Insecticide', scoreToxicite: 78, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Carbamate systémique. Très toxique pour les oiseaux.', impactOrganes: ['Système nerveux — Inhibition cholinestérase', 'Foie — Hépatotoxicité sévère', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Neem', 'Bacillus thuringiensis', 'Prédateurs naturels', 'Rotation culturale'], precautionsStrictes: ['Très toxique pour les oiseaux', 'Inhibition cholinestérase', 'Porter EPP complet'] },
-  { id: 'i14', nom: 'Méthomyl', type: 'Insecticide', scoreToxicite: 82, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Carbamate. Extrêmement toxique pour les oiseaux et abeilles.', impactOrganes: ['Système nerveux — Toxicité aiguë', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Méthodes biologiques uniquement', 'Prédateurs naturels', 'Pièges à phéromones'], precautionsStrictes: ['Extrêmement toxique', 'Interdit sur nombreuses cultures', 'Antidote : atropine'] },
-  { id: 'i15', nom: 'Acétamipride', type: 'Insecticide', scoreToxicite: 48, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Néonicotinoïde. Moins toxique pour les abeilles que d\'autres.', impactOrganes: ['Système nerveux — Neurotoxicité modérée', 'Foie — Hépatotoxicité légère', 'Reins — Élimination rénale'], equivalentsBiologiques: ['Bacillus thuringiensis', 'Neem', 'Savon insecticide', 'Prédateurs naturels'], precautionsStrictes: ['Moins toxique pour les abeilles', 'Respecter les doses', 'Délai de carence 7 jours'] },
+  // ===== INSECTICIDES =====
+  {
+    id: 'i001',
+    nom: 'Chlorpyrifos',
+    type: 'Insecticide',
+    scoreToxicite: 92,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Bioaccumulation dans la chaîne alimentaire. Résidus persistants.',
+    impactOrganes: ['Foie — Hépatotoxicité sévère', 'Reins — Insuffisance rénale', 'Cerveau — Neurodéveloppement'],
+    equivalentsBiologiques: ['Extrait de neem', 'Bacillus thuringiensis', 'Pièges à phéromones', 'Coccinelles'],
+    precautionsStrictes: ['Interdit UE depuis 2020', 'Très toxique OMS', 'Effets irréversibles'],
+  },
+  {
+    id: 'i002',
+    nom: 'Imidaclopride',
+    type: 'Insecticide',
+    scoreToxicite: 58,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Toxique pour les pollinisateurs. Contamination du nectar.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Système endocrinien — Perturbateur'],
+    equivalentsBiologiques: ['Savon noir insecticide', 'Huile de menthe', 'Terre de diatomée', 'Plantes compagnes'],
+    precautionsStrictes: ['Ne pas traiter en floraison', 'Toxique pour abeilles', 'Délai 21 jours'],
+  },
+  {
+    id: 'i003',
+    nom: 'Lambda-cyhalothrine',
+    type: 'Insecticide',
+    scoreToxicite: 75,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Très toxique pour les organismes aquatiques. Résidus modérés.',
+    impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Métabolisation', 'Peau — Absorption possible'],
+    equivalentsBiologiques: ['Bacillus thuringiensis', 'Neem', 'Pièges lumineux', 'Prédateurs naturels'],
+    precautionsStrictes: ['Très toxique aquatique', 'EPP complet', 'Distance des cours d\'eau'],
+  },
+  {
+    id: 'i004',
+    nom: 'Deltaméthrine',
+    type: 'Insecticide',
+    scoreToxicite: 70,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Pyréthrinoïde de synthèse. Toxique pour les insectes utiles.',
+    impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Métabolisation', 'Peau — Irritation'],
+    equivalentsBiologiques: ['Bacillus thuringiensis', 'Extraits botaniques', 'Lutte biologique', 'Piégeage'],
+    precautionsStrictes: ['Toxique pour les abeilles', 'Application le soir', 'EPP obligatoire'],
+  },
+  {
+    id: 'i005',
+    nom: 'Malathion',
+    type: 'Insecticide',
+    scoreToxicite: 65,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Organophosphoré. Dégradation relativement rapide.',
+    impactOrganes: ['Système nerveux — Inhibition cholinestérase', 'Foie — Métabolisation', 'Reins — Élimination'],
+    equivalentsBiologiques: ['Neem', 'Savon insecticide', 'Bacillus thuringiensis', 'Prédateurs naturels'],
+    precautionsStrictes: ['Inhibition cholinestérase', 'EPP complet', 'Délai de carence'],
+  },
+  {
+    id: 'i006',
+    nom: 'Diméthoate',
+    type: 'Insecticide',
+    scoreToxicite: 78,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Systémique. Pénètre dans la plante. Résidus dans les fruits.',
+    impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'],
+    equivalentsBiologiques: ['Neem', 'Bacillus thuringiensis', 'Pièges chromatiques', 'Lutte biologique'],
+    precautionsStrictes: ['Systémique', 'Très toxique', 'EPP complet obligatoire'],
+  },
+  {
+    id: 'i007',
+    nom: 'Abamectine',
+    type: 'Insecticide',
+    scoreToxicite: 68,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Origine naturelle mais synthèse. Toxique pour les organismes du sol.',
+    impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Métabolisation', 'Yeux — Irritation'],
+    equivalentsBiologiques: ['Bacillus thuringiensis', 'Extraits botaniques', 'Prédateurs naturels', 'Piégeage'],
+    precautionsStrictes: ['Toxique pour les vers de terre', 'Respecter les doses', 'EPP recommandé'],
+  },
+  {
+    id: 'i008',
+    nom: 'Thiaméthoxame',
+    type: 'Insecticide',
+    scoreToxicite: 62,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Néonicotinoïde. Très toxique pour les pollinisateurs.',
+    impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Métabolisation', 'Système endocrinien'],
+    equivalentsBiologiques: ['Savon noir', 'Huiles essentielles', 'Lutte biologique', 'Rotation culturale'],
+    precautionsStrictes: ['Interdit sur certaines cultures', 'Toxique abeilles', 'Alternatives recommandées'],
+  },
+  {
+    id: 'i009',
+    nom: 'Acétamipride',
+    type: 'Insecticide',
+    scoreToxicite: 55,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Néonicotinoïde. Moins toxique pour les abeilles que d\'autres.',
+    impactOrganes: ['Système nerveux — Neurotoxicité modérée', 'Foie — Métabolisation', 'Reins — Élimination'],
+    equivalentsBiologiques: ['Neem', 'Savon insecticide', 'Prédateurs naturels', 'Pièges'],
+    precautionsStrictes: ['Moins toxique abeilles', 'Respecter les doses', 'Délai de carence'],
+  },
+  {
+    id: 'i010',
+    nom: 'Spinosad',
+    type: 'Insecticide',
+    scoreToxicite: 35,
+    niveauRisque: 'Faible',
+    impactChaineAlimentaire: 'Origine naturelle (bactérie). Dégradation rapide.',
+    impactOrganes: ['Système nerveux — Effets modérés', 'Foie — Métabolisation facile', 'Peau — Faible absorption'],
+    equivalentsBiologiques: ['Bacillus thuringiensis', 'Extraits botaniques', 'Lutte biologique', 'Prédateurs'],
+    precautionsStrictes: ['Accepté en bio sous conditions', 'Toxique pour les abeilles (contact)', 'Application le soir'],
+  },
 
-  // FUNGICIDES (30+)
-  { id: 'f1', nom: 'Mancozèbe', type: 'Fongicide', scoreToxicite: 62, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Dégradation en ETU (toxique). Résidus dans tubercules et fruits.', impactOrganes: ['Thyroïde — Perturbation endocrinienne', 'Foie — Stress oxydatif hépatique', 'Reins — Néphrotoxicité modérée'], equivalentsBiologiques: ['Bouillie bordelaise (dosage modéré)', 'Bacillus subtilis', 'Bicarbonate de potassium', 'Extrait de prêle'], precautionsStrictes: ['Délai de carence 14 jours', 'Ne pas inhaler les poussières', 'Rincer abondamment les récoltes'] },
-  { id: 'f2', nom: 'Chlorothalonil', type: 'Fongicide', scoreToxicite: 75, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Cancérogène probable. Persistant dans l\'environnement.', impactOrganes: ['Reins — Néphrotoxicité sévère', 'Foie — Hépatotoxicité', 'Cancérogène probable'], equivalentsBiologiques: ['Bouillie bordelaise', 'Bacillus subtilis', 'Bicarbonate de soude', 'Extraits de plantes'], precautionsStrictes: ['Cancérogène suspecté', 'Interdit dans l\'UE', 'Porter EPP complet'] },
-  { id: 'f3', nom: 'Bouillie bordelaise', type: 'Fongicide', scoreToxicite: 25, niveauRisque: 'Faible', impactChaineAlimentaire: 'Accumulation cuivre dans les sols. Faible impact aux doses recommandées.', impactOrganes: ['Foie — Risque minimal', 'Reins — Très faible toxicité', 'Peau — Irritation possible'], equivalentsBiologiques: ['Trichoderma harzianum', 'Lait dilué 10%', 'Infusion de prêle', 'Bacillus amyloliquefaciens'], precautionsStrictes: ['Max 6kg/ha/an', 'Porter des gants', 'Ne pas surdoser'] },
-  { id: 'f4', nom: 'Carbendazime', type: 'Fongicide', scoreToxicite: 68, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Benzimidazole. Perturbateur endocrinien. Résidus dans les fruits.', impactOrganes: ['Système reproducteur — Toxicité', 'Foie — Hépatotoxicité', 'Cancérogène possible'], equivalentsBiologiques: ['Bacillus subtilis', 'Bicarbonate de potassium', 'Extraits de prêle', 'Rotation culturale'], precautionsStrictes: ['Perturbateur endocrinien', 'Interdit dans l\'UE', 'Résidus dans les aliments'] },
-  { id: 'f5', nom: 'Métalaxyl', type: 'Fongicide', scoreToxicite: 45, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Systémique. Pénètre dans la plante. Résidus dans les tissus.', impactOrganes: ['Foie — Hépatotoxicité modérée', 'Reins — Néphrotoxicité légère', 'Système nerveux — Effets minimes'], equivalentsBiologiques: ['Trichoderma harzianum', 'Bacillus subtilis', 'Bicarbonate de soude', 'Rotation culturale'], precautionsStrictes: ['Systémique - résidus dans la plante', 'Risque de résistance', 'Alterner avec d\'autres fongicides'] },
-  { id: 'f6', nom: 'Manèbe', type: 'Fongicide', scoreToxicite: 58, niveauRisque: 'Modéré', impactChaineAlimentaire: 'EBDC. Dégradation en ETU. Résidus dans les cultures.', impactOrganes: ['Thyroïde — Perturbation endocrinienne', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Bouillie bordelaise', 'Bacillus subtilis', 'Bicarbonate de potassium', 'Extraits de plantes'], precautionsStrictes: ['Délai de carence 14 jours', 'Ne pas inhaler', 'Rincer les récoltes'] },
-  { id: 'f7', nom: 'Propiconazole', type: 'Fongicide', scoreToxicite: 52, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Triazole. Systémique. Résidus dans les céréales.', impactOrganes: ['Foie — Hépatotoxicité modérée', 'Système endocrinien — Perturbation possible', 'Reins — Élimination rénale'], equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Bicarbonate de soude', 'Rotation culturale'], precautionsStrictes: ['Systémique', 'Risque de résistance', 'Respecter les doses'] },
-  { id: 'f8', nom: 'Tébuconazole', type: 'Fongicide', scoreToxicite: 55, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Triazole. Utilisé sur céréales. Résidus persistants.', impactOrganes: ['Foie — Hépatotoxicité', 'Système reproducteur — Toxicité possible', 'Reins — Néphrotoxicité légère'], equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Bicarbonate de potassium', 'Rotation culturale'], precautionsStrictes: ['Triazole - effets systémiques', 'Perturbateur endocrinien suspecté', 'Porter EPP'] },
-  { id: 'f9', nom: 'Azoxystrobine', type: 'Fongicide', scoreToxicite: 38, niveauRisque: 'Faible', impactChaineAlimentaire: 'Strobilurine. Moins toxique. Utilisé sur nombreuses cultures.', impactOrganes: ['Foie — Hépatotoxicité légère', 'Peau — Irritation possible'], equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Bicarbonate de soude', 'Extraits de prêle'], precautionsStrictes: ['Moins toxique', 'Respecter les doses', 'Délai de carence 7 jours'] },
-  { id: 'f10', nom: 'Cyproconazole', type: 'Fongicide', scoreToxicite: 50, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Triazole. Systémique. Résidus dans les céréales.', impactOrganes: ['Foie — Hépatotoxicité modérée', 'Système nerveux — Neurotoxicité légère', 'Reins — Élimination rénale'], equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Bicarbonate de potassium', 'Rotation culturale'], precautionsStrictes: ['Systémique', 'Triazole - surveillance requise', 'Porter EPP'] },
+  // ===== FONGICIDES =====
+  {
+    id: 'f001',
+    nom: 'Mancozèbe',
+    type: 'Fongicide',
+    scoreToxicite: 62,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Dégradation en ETU (toxique). Résidus dans tubercules et fruits.',
+    impactOrganes: ['Thyroïde — Perturbation endocrinienne', 'Foie — Stress oxydatif', 'Reins — Néphrotoxicité modérée'],
+    equivalentsBiologiques: ['Bouillie bordelaise (modéré)', 'Bacillus subtilis', 'Bicarbonate de potassium', 'Prêle'],
+    precautionsStrictes: ['Délai 14 jours', 'Ne pas inhaler', 'Rincer les récoltes'],
+  },
+  {
+    id: 'f002',
+    nom: 'Chlorothalonil',
+    type: 'Fongicide',
+    scoreToxicite: 75,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Classé cancérigène probable. Persistant dans l\'environnement.',
+    impactOrganes: ['Foie — Hépatotoxicité', 'Reins — Néphrotoxicité', 'Système immunitaire — Effets potentiels'],
+    equivalentsBiologiques: ['Bouillie bordelaise', 'Bacillus subtilis', 'Extraits de plantes', 'Rotation culturale'],
+    precautionsStrictes: ['Cancérigène probable', 'EPP complet', 'Distance de sécurité'],
+  },
+  {
+    id: 'f003',
+    nom: 'Bouillie bordelaise',
+    type: 'Fongicide',
+    scoreToxicite: 25,
+    niveauRisque: 'Faible',
+    impactChaineAlimentaire: 'Accumulation cuivre dans les sols. Faible impact alimentaire aux doses recommandées.',
+    impactOrganes: ['Foie — Risque minimal', 'Reins — Très faible toxicité', 'Peau — Irritation possible'],
+    equivalentsBiologiques: ['Trichoderma harzianum', 'Lait dilué 10%', 'Infusion de prêle', 'Bacillus amyloliquefaciens'],
+    precautionsStrictes: ['Max 6kg/ha/an', 'Porter des gants', 'Ne pas surdoser'],
+  },
+  {
+    id: 'f004',
+    nom: 'Métalaxyl',
+    type: 'Fongicide',
+    scoreToxicite: 58,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Systémique. Pénètre dans la plante. Résidus possibles.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Système nerveux — Effets modérés'],
+    equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Extraits botaniques', 'Rotation culturale'],
+    precautionsStrictes: ['Systémique', 'Risque de résistance', 'Alterner les modes d\'action'],
+  },
+  {
+    id: 'f005',
+    nom: 'Carbendazime',
+    type: 'Fongicide',
+    scoreToxicite: 72,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Benzimidazole. Persistant. Résidus dans les aliments.',
+    impactOrganes: ['Foie — Hépatotoxicité', 'Reins — Néphrotoxicité', 'Système reproducteur — Effets potentiels'],
+    equivalentsBiologiques: ['Bouillie bordelaise', 'Bacillus subtilis', 'Extraits de plantes', 'Solarisation'],
+    precautionsStrictes: ['Interdit dans l\'UE', 'Perturbateur endocrinien', 'Alternatives recommandées'],
+  },
+  {
+    id: 'f006',
+    nom: 'Tebuconazole',
+    type: 'Fongicide',
+    scoreToxicite: 65,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Triazole. Systémique. Résidus dans les céréales.',
+    impactOrganes: ['Foie — Métabolisation hépatique', 'Reins — Élimination rénale', 'Système endocrinien — Perturbateur'],
+    equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Extraits botaniques', 'Rotation culturale'],
+    precautionsStrictes: ['Systémique', 'Perturbateur endocrinien', 'Respecter les doses'],
+  },
+  {
+    id: 'f007',
+    nom: 'Azoxystrobine',
+    type: 'Fongicide',
+    scoreToxicite: 52,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Strobilurine. Systémique. Dégradation modérée.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Peau — Irritation légère'],
+    equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Bicarbonate', 'Extraits de plantes'],
+    precautionsStrictes: ['Risque de résistance', 'Alterner les modes d\'action', 'Délai de carence'],
+  },
+  {
+    id: 'f008',
+    nom: 'Propiconazole',
+    type: 'Fongicide',
+    scoreToxicite: 68,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Triazole. Systémique. Persistant dans les céréales.',
+    impactOrganes: ['Foie — Hépatotoxicité modérée', 'Reins — Néphrotoxicité', 'Système endocrinien — Perturbateur'],
+    equivalentsBiologiques: ['Bacillus subtilis', 'Trichoderma', 'Extraits botaniques', 'Rotation culturale'],
+    precautionsStrictes: ['Systémique', 'Perturbateur endocrinien', 'EPP recommandé'],
+  },
+  {
+    id: 'f009',
+    nom: 'Cyprodinil',
+    type: 'Fongicide',
+    scoreToxicite: 48,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Anilinopyrimidine. Dégradation modérée.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Peau — Irritation modérée'],
+    equivalentsBiologiques: ['Bacillus subtilis', 'Bicarbonate de sodium', 'Extraits de plantes', 'Rotation'],
+    precautionsStrictes: ['Respecter les doses', 'Délai de carence', 'Alternance des modes d\'action'],
+  },
+  {
+    id: 'f010',
+    nom: 'Soufre mouillable',
+    type: 'Fongicide',
+    scoreToxicite: 30,
+    niveauRisque: 'Faible',
+    impactChaineAlimentaire: 'Élément naturel. Dégradation rapide. Faible impact.',
+    impactOrganes: ['Peau — Irritation possible', 'Yeux — Irritation modérée', 'Voies respiratoires — Irritation'],
+    equivalentsBiologiques: ['Bacillus subtilis', 'Bicarbonate', 'Lait dilué', 'Infusion de prêle'],
+    precautionsStrictes: ['Ne pas utiliser par forte chaleur', 'Protection des yeux', 'Ventilation'],
+  },
 
-  // ACARICIDES (10+)
-  { id: 'a1', nom: 'Abamectine', type: 'Acaricide', scoreToxicite: 52, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Acaricide et insecticide. Toxique pour les organismes du sol.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité modérée', 'Yeux — Irritation sévère'], equivalentsBiologiques: ['Acariens prédateurs', 'Huiles horticoles', 'Savon insecticide', 'Neem'], precautionsStrictes: ['Toxique pour les abeilles', 'Éviter le contact avec les yeux', 'Porter des lunettes'] },
-  { id: 'a2', nom: 'Spirodiclofen', type: 'Acaricide', scoreToxicite: 42, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Acaricide spécifique. Moins d\'impact sur les non-cibles.', impactOrganes: ['Foie — Hépatotoxicité légère', 'Peau — Irritation modérée'], equivalentsBiologiques: ['Acariens prédateurs', 'Huiles horticoles', 'Savon insecticide', 'Soufre'], precautionsStrictes: ['Spécifique acariens', 'Moins d\'impact sur auxiliaires', 'Respecter les doses'] },
-  { id: 'a3', nom: 'Fenazaquine', type: 'Acaricide', scoreToxicite: 48, niveauRisque: 'Modéré', impactChaineAlimentaire: 'Acaricide. Impact modéré sur l\'environnement.', impactOrganes: ['Foie — Hépatotoxicité modérée', 'Reins — Néphrotoxicité légère'], equivalentsBiologiques: ['Acariens prédateurs', 'Huiles horticoles', 'Soufre', 'Savon insecticide'], precautionsStrictes: ['Spécifique acariens', 'Porter EPP', 'Éviter le contact avec la peau'] },
+  // ===== ACARICIDES =====
+  {
+    id: 'a001',
+    nom: 'Abamectine (acaricide)',
+    type: 'Acaricide',
+    scoreToxicite: 68,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Toxique pour les organismes du sol. Résidus modérés.',
+    impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Métabolisation', 'Yeux — Irritation'],
+    equivalentsBiologiques: ['Acariens prédateurs', 'Huiles horticoles', 'Savon insecticide', 'Soufre'],
+    precautionsStrictes: ['Toxique pour les vers de terre', 'Respecter les doses', 'EPP recommandé'],
+  },
+  {
+    id: 'a002',
+    nom: 'Spirodiclofène',
+    type: 'Acaricide',
+    scoreToxicite: 55,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Inhibiteur de synthèse des lipides. Impact modéré.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Peau — Absorption possible'],
+    equivalentsBiologiques: ['Acariens prédateurs', 'Huiles horticoles', 'Soufre', 'Lutte biologique'],
+    precautionsStrictes: ['Spécifique acariens', 'Respecter les doses', 'Délai de carence'],
+  },
+  {
+    id: 'a003',
+    nom: 'Hexythiazox',
+    type: 'Acaricide',
+    scoreToxicite: 42,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Inhibiteur de mue. Impact modéré sur l\'environnement.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Peau — Irritation légère'],
+    equivalentsBiologiques: ['Acariens prédateurs', 'Huiles horticoles', 'Soufre', 'Rotation culturale'],
+    precautionsStrictes: ['Spécifique acariens', 'Risque de résistance', 'Alternance des produits'],
+  },
 
-  // NÉMATOCIDES (5+)
-  { id: 'n1', nom: 'Oxamyl', type: 'Nematicide', scoreToxicite: 88, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Nematicide systémique. Très toxique. Contamination des sols.', impactOrganes: ['Système nerveux — Inhibition cholinestérase', 'Foie — Hépatotoxicité sévère', 'Reins — Néphrotoxicité sévère'], equivalentsBiologiques: ['Rotation culturale', 'Solarisation du sol', 'Plantes nématicides (tagète)', 'Biofumigation'], precautionsStrictes: ['Extrêmement toxique', 'Inhibition cholinestérase', 'Porter EPP complet'] },
-  { id: 'n2', nom: 'Fosthiazate', type: 'Nematicide', scoreToxicite: 75, niveauRisque: 'Élevé', impactChaineAlimentaire: 'Nematicide organophosphoré. Contamination des sols.', impactOrganes: ['Système nerveux — Neurotoxicité', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'], equivalentsBiologiques: ['Rotation culturale', 'Solarisation', 'Tagète', 'Biofumigation'], precautionsStrictes: ['Organophosphoré', 'Toxique pour les vers de terre', 'Porter EPP complet'] },
+  // ===== NÉMATICIDES =====
+  {
+    id: 'n001',
+    nom: 'Oxamyl',
+    type: 'Nématicide',
+    scoreToxicite: 88,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Très toxique. Systémique. Résidus dans les racines.',
+    impactOrganes: ['Système nerveux — Neurotoxicité sévère', 'Foie — Hépatotoxicité', 'Reins — Néphrotoxicité'],
+    equivalentsBiologiques: ['Rotation culturale', 'Solarisation du sol', 'Plantes pièges', 'Nématodes bénéfiques'],
+    precautionsStrictes: ['Très toxique', 'EPP complet obligatoire', 'Restrictions d\'usage'],
+  },
+  {
+    id: 'n002',
+    nom: 'Fosthiazate',
+    type: 'Nématicide',
+    scoreToxicite: 75,
+    niveauRisque: 'Élevé',
+    impactChaineAlimentaire: 'Organophosphoré. Systémique. Persistant dans le sol.',
+    impactOrganes: ['Système nerveux — Inhibition cholinestérase', 'Foie — Métabolisation', 'Reins — Élimination'],
+    equivalentsBiologiques: ['Rotation culturale', 'Solarisation', 'Plantes résistantes', 'Nématodes bénéfiques'],
+    precautionsStrictes: ['Organophosphoré', 'EPP complet', 'Distance de sécurité'],
+  },
+
+  // ===== RÉGULATEURS DE CROISSANCE =====
+  {
+    id: 'r001',
+    nom: 'Chlorméquat',
+    type: 'Régulateur',
+    scoreToxicite: 58,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Régulateur de croissance. Résidus dans les céréales.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Système endocrinien — Effets potentiels'],
+    equivalentsBiologiques: ['Sélection variétale', 'Fertilisation équilibrée', 'Densité de plantation', 'Taille'],
+    precautionsStrictes: ['Respecter les doses', 'Stade phénologique précis', 'Délai de carence'],
+  },
+  {
+    id: 'r002',
+    nom: 'Paclobutrazole',
+    type: 'Régulateur',
+    scoreToxicite: 52,
+    niveauRisque: 'Modéré',
+    impactChaineAlimentaire: 'Inhibiteur de gibbérellines. Persistant dans le sol.',
+    impactOrganes: ['Foie — Métabolisation', 'Reins — Élimination', 'Système reproducteur — Effets potentiels'],
+    equivalentsBiologiques: ['Taille appropriée', 'Fertilisation équilibrée', 'Sélection variétale', 'Densité'],
+    precautionsStrictes: ['Persistant', 'Respecter les doses', 'Stade phénologique'],
+  },
 ];
 
 /**
- * Génère des pesticides supplémentaires pour atteindre 1200+
- * Utilise des combinaisons réalistes de matières actives
+ * Recherche intelligente dans la base de données
+ * Insensible à la casse et aux accents
  */
-export function generateExtendedDatabase(): Pesticide[] {
-  const extended: Pesticide[] = [...pesticidesDatabase];
+export function searchPesticides(query: string): Pesticide[] {
+  if (!query.trim()) return [];
   
-  const prefixes = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Theta', 'Iota', 'Kappa', 'Lambda'];
-  const suffixes = ['me', 'le', 'ne', 'te', 'se', 're', 'fe', 'ge', 'he', 'je'];
-  const types: Array<'Herbicide' | 'Insecticide' | 'Fongicide'> = ['Herbicide', 'Insecticide', 'Fongicide'];
+  const normalizedQuery = normalizeString(query);
   
-  // Générer 1100 pesticides supplémentaires
-  for (let i = 0; i < 1100; i++) {
-    const type = types[i % 3];
-    const prefix = prefixes[i % prefixes.length];
-    const suffix = suffixes[i % suffixes.length];
-    const baseName = `Produit-${prefix}${suffix}-${i}`;
+  return pesticidesDatabase.filter(pesticide => {
+    const normalizedNom = normalizeString(pesticide.nom);
+    const normalizedType = normalizeString(pesticide.type);
     
-    const scoreToxicite = Math.floor(Math.random() * 70) + 20; // 20-90
-    const niveauRisque: 'Faible' | 'Modéré' | 'Élevé' = 
-      scoreToxicite >= 70 ? 'Élevé' : scoreToxicite >= 45 ? 'Modéré' : 'Faible';
-    
-    extended.push({
-      id: `gen-${i}`,
-      nom: baseName,
-      type,
-      scoreToxicite,
-      niveauRisque,
-      impactChaineAlimentaire: `${type} avec risque de résidus dans la chaîne alimentaire. Surveillance recommandée.`,
-      impactOrganes: [
-        'Foie — Métabolisation hépatique',
-        'Reins — Élimination rénale',
-        'Système nerveux — Effets potentiels à haute dose'
-      ],
-      equivalentsBiologiques: [
-        'Extrait de neem',
-        'Bacillus thuringiensis',
-        'Savon insecticide naturel',
-        'Rotation culturale'
-      ],
-      precautionsStrictes: [
-        'Porter des équipements de protection',
-        'Respecter les doses recommandées',
-        'Délai de carence avant récolte'
-      ]
-    });
-  }
-  
-  return extended;
+    return normalizedNom.includes(normalizedQuery) || 
+           normalizedType.includes(normalizedQuery);
+  });
 }
 
 /**
- * Recherche insensible à la casse et aux accents
+ * Récupère un pesticide par son nom exact
  */
-export function searchPesticides(query: string, database: Pesticide[] = []): Pesticide[] {
-  const normalizedQuery = query.toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
-    .trim();
-  
-  if (!normalizedQuery) return [];
-  
-  const db = database.length > 0 ? database : generateExtendedDatabase();
-  
-  return db.filter(pesticide => {
-    const normalizedName = pesticide.nom.toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    
-    return normalizedName.includes(normalizedQuery);
-  }).slice(0, 50); // Limiter à 50 résultats pour la performance
+export function getPesticideByName(name: string): Pesticide | null {
+  const normalizedName = normalizeString(name);
+  return pesticidesDatabase.find(p => normalizeString(p.nom) === normalizedName) || null;
 }
 
 /**
- * Obtient tous les pesticides (base étendue)
+ * Récupère tous les pesticides d'un type spécifique
  */
-export function getAllPesticides(): Pesticide[] {
-  return generateExtendedDatabase();
+export function getPesticidesByType(type: Pesticide['type']): Pesticide[] {
+  return pesticidesDatabase.filter(p => p.type === type);
+}
+
+/**
+ * Récupère les statistiques de la base de données
+ */
+export function getDatabaseStats() {
+  const total = pesticidesDatabase.length;
+  const byType = {
+    Herbicide: pesticidesDatabase.filter(p => p.type === 'Herbicide').length,
+    Insecticide: pesticidesDatabase.filter(p => p.type === 'Insecticide').length,
+    Fongicide: pesticidesDatabase.filter(p => p.type === 'Fongicide').length,
+    Acaricide: pesticidesDatabase.filter(p => p.type === 'Acaricide').length,
+    Nématicide: pesticidesDatabase.filter(p => p.type === 'Nématicide').length,
+    Régulateur: pesticidesDatabase.filter(p => p.type === 'Régulateur').length,
+  };
+  const byRisk = {
+    Faible: pesticidesDatabase.filter(p => p.niveauRisque === 'Faible').length,
+    Modéré: pesticidesDatabase.filter(p => p.niveauRisque === 'Modéré').length,
+    Élevé: pesticidesDatabase.filter(p => p.niveauRisque === 'Élevé').length,
+  };
+  
+  return { total, byType, byRisk };
 }

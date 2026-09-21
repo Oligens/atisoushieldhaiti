@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { analyzePlantImage, type VisionDiagnosis } from '../services/agriculturalAI';
-import { saveFieldValidation, type ValidationLabel } from '../services/fieldValidation';
+import { saveAgriculturalCase, updateCaseValidation } from '../services/researchData';
+import type { ValidationLabel } from '../services/fieldValidation';
 
 interface PlantScannerProps { isDesktop: boolean; }
 
@@ -12,6 +13,7 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
   const [validation, setValidation] = useState<ValidationLabel | null>(null);
+  const [caseId, setCaseId] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,6 +28,23 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
       try {
         const diagnosis = await analyzePlantImage({ imageData, mimeType: file.type, crop, location });
         setResult(diagnosis);
+        try {
+          const match = location.match(/(-?\\d+(?:\\.\\d+)?)[,; ]+(-?\\d+(?:\\.\\d+)?)/);
+          const saved = await saveAgriculturalCase({
+            crop: crop || 'Non renseigné',
+            location: location || 'Non renseigné',
+            latitude: match ? Number(match[1]) : null,
+            longitude: match ? Number(match[2]) : null,
+            predicted_disease: diagnosis.disease,
+            confidence: diagnosis.confidence,
+            validation_label: null,
+            weather: null,
+            field_outcome: null
+          });
+          setCaseId(saved.id);
+        } catch (dbError) {
+          setError(dbError instanceof Error ? dbError.message : 'Enregistrement du cas impossible.');
+        }
         setShowDetail(null);
         setScanState('result');
       } catch (e) {
@@ -39,7 +58,11 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
 
   const requestCamera = () => fileInputRef.current?.click();
 
-  const validate = (label: ValidationLabel) => { if (!result) return; saveFieldValidation({ crop, location, predictedDisease: result.disease, confidence: result.confidence, label }); setValidation(label); };
+  const validate = async (label: ValidationLabel) => {
+    if (!result || !caseId) return;
+    try { await updateCaseValidation(caseId, label); setValidation(label); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Validation terrain impossible.'); }
+  };
 
   const resetScan = () => {
     setScanState('camera');
@@ -47,6 +70,8 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
     setImagePreview('');
     setError('');
     setShowDetail(null);
+    setValidation(null);
+    setCaseId(null);
   };
 
   const getLocation = () => {

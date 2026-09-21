@@ -1,130 +1,428 @@
 -- AtisouShield Haïti — Neon PostgreSQL complet
--- Authentification conservée côté application (localStorage). Aucun mot de passe ici.
+-- Schéma canonique aligné avec api/research.ts
+-- Authentification conservée côté application (localStorage).
+-- Aucun mot de passe ni mécanisme d'authentification n'est stocké ici.
+
+BEGIN;
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- ============================================================
+-- UTILISATEURS
+-- ============================================================
+
 CREATE TABLE IF NOT EXISTS public.utilisateurs (
-  id TEXT PRIMARY KEY, nom VARCHAR(255) NOT NULL, email VARCHAR(255) UNIQUE,
-  region VARCHAR(255), pays VARCHAR(100), role VARCHAR(50) NOT NULL DEFAULT 'agriculteur',
-  date_inscription TIMESTAMPTZ NOT NULL DEFAULT NOW(), derniere_connexion TIMESTAMPTZ
+  id TEXT PRIMARY KEY
 );
+
+ALTER TABLE public.utilisateurs ADD COLUMN IF NOT EXISTS nom TEXT;
+ALTER TABLE public.utilisateurs ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.utilisateurs ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'agriculteur';
+ALTER TABLE public.utilisateurs ADD COLUMN IF NOT EXISTS zone TEXT;
+ALTER TABLE public.utilisateurs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.utilisateurs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_utilisateurs_email ON public.utilisateurs(email);
-CREATE INDEX IF NOT EXISTS idx_utilisateurs_pays ON public.utilisateurs(pays);
+
+-- ============================================================
+-- ZONES AGRICOLES
+-- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.zones_agricoles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), nom VARCHAR(255) NOT NULL,
-  pays VARCHAR(100) NOT NULL, region VARCHAR(255) NOT NULL,
-  latitude DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
-  longitude DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
-  type_culture VARCHAR(255), superficie_hectares DECIMAL(10,2), date_creation TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
-CREATE INDEX IF NOT EXISTS idx_zones_pays ON public.zones_agricoles(pays);
-CREATE INDEX IF NOT EXISTS idx_zones_region ON public.zones_agricoles(region);
-CREATE INDEX IF NOT EXISTS idx_zones_coords ON public.zones_agricoles(latitude,longitude);
+
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS nom TEXT;
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS departement TEXT;
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS commune TEXT;
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS type_culture TEXT;
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS superficie_hectares NUMERIC;
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.zones_agricoles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_zones_agricoles_nom ON public.zones_agricoles(nom);
+CREATE INDEX IF NOT EXISTS idx_zones_agricoles_departement ON public.zones_agricoles(departement);
+CREATE INDEX IF NOT EXISTS idx_zones_agricoles_commune ON public.zones_agricoles(commune);
+CREATE INDEX IF NOT EXISTS idx_zones_agricoles_coordinates ON public.zones_agricoles(latitude, longitude);
+
+-- ============================================================
+-- ALERTES SANITAIRES
+-- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.alertes_sanitaires (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), titre VARCHAR(255) NOT NULL, description TEXT NOT NULL,
-  niveau VARCHAR(20) NOT NULL CHECK (niveau IN ('faible','modere','eleve','critique')),
-  pays VARCHAR(100) NOT NULL, region VARCHAR(255) NOT NULL,
-  zone_id UUID REFERENCES public.zones_agricoles(id) ON DELETE SET NULL,
-  maladie_nom VARCHAR(255), pathogene VARCHAR(255), icon VARCHAR(10) DEFAULT '⚠️',
-  active BOOLEAN NOT NULL DEFAULT TRUE, date_alerte TIMESTAMPTZ NOT NULL DEFAULT NOW(), date_expiration TIMESTAMPTZ
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
-CREATE INDEX IF NOT EXISTS idx_alertes_pays ON public.alertes_sanitaires(pays);
-CREATE INDEX IF NOT EXISTS idx_alertes_region ON public.alertes_sanitaires(region);
-CREATE INDEX IF NOT EXISTS idx_alertes_niveau ON public.alertes_sanitaires(niveau);
+
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS zone_id UUID;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS maladie TEXT;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS culture TEXT;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS niveau TEXT;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS date_debut TIMESTAMPTZ;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS date_fin TIMESTAMPTZ;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.alertes_sanitaires ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_alertes_zone ON public.alertes_sanitaires(zone_id);
 CREATE INDEX IF NOT EXISTS idx_alertes_active ON public.alertes_sanitaires(active);
-CREATE INDEX IF NOT EXISTS idx_alertes_date ON public.alertes_sanitaires(date_alerte DESC);
+CREATE INDEX IF NOT EXISTS idx_alertes_maladie ON public.alertes_sanitaires(maladie);
+
+-- ============================================================
+-- HISTORIQUE DES SCANS
+-- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.historique_scans (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id TEXT NOT NULL, image_url TEXT,
-  diagnostic_resultat TEXT NOT NULL, maladie_detectee VARCHAR(255),
-  confiance INTEGER CHECK (confiance BETWEEN 0 AND 100), traitements_suggeres TEXT[],
-  zone_id UUID REFERENCES public.zones_agricoles(id) ON DELETE SET NULL, date_scan TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
-CREATE INDEX IF NOT EXISTS idx_scans_user ON public.historique_scans(user_id);
-CREATE INDEX IF NOT EXISTS idx_scans_date ON public.historique_scans(date_scan DESC);
-CREATE INDEX IF NOT EXISTS idx_scans_maladie ON public.historique_scans(maladie_detectee);
-CREATE INDEX IF NOT EXISTS idx_scans_zone ON public.historique_scans(zone_id);
+
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS culture TEXT;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS maladie_detectee TEXT;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS confiance DOUBLE PRECISION;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS localisation TEXT;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS image_reference TEXT;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS resultat TEXT;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS traitement_recommande TEXT;
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_historique_user ON public.historique_scans(user_id);
+CREATE INDEX IF NOT EXISTS idx_historique_created ON public.historique_scans(created_at DESC);
+
+-- ============================================================
+-- DONNÉES MÉTÉOROLOGIQUES
+-- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.meteo_records (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), zone_id UUID REFERENCES public.zones_agricoles(id) ON DELETE CASCADE,
-  user_id TEXT, temperature DECIMAL(6,2) NOT NULL, humidite DECIMAL(5,2) NOT NULL CHECK (humidite BETWEEN 0 AND 100),
-  vent DECIMAL(6,2), condition VARCHAR(100), risque_fongique VARCHAR(20), date_mesure TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
+
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS zone_id UUID;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS temperature DOUBLE PRECISION;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS humidite DOUBLE PRECISION;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS precipitation DOUBLE PRECISION;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS vitesse_vent DOUBLE PRECISION;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS conditions TEXT;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS observed_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_meteo_zone ON public.meteo_records(zone_id);
-CREATE INDEX IF NOT EXISTS idx_meteo_user ON public.meteo_records(user_id);
-CREATE INDEX IF NOT EXISTS idx_meteo_date ON public.meteo_records(date_mesure DESC);
+CREATE INDEX IF NOT EXISTS idx_meteo_date ON public.meteo_records(observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_meteo_coordinates ON public.meteo_records(latitude, longitude);
+
+-- ============================================================
+-- CORPUS DE CAS AGRICOLES
+-- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.agricultural_cases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id TEXT NOT NULL DEFAULT 'anonymous',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), crop TEXT NOT NULL DEFAULT 'Non renseigné',
-  location TEXT NOT NULL DEFAULT 'Non renseigné',
-  latitude DOUBLE PRECISION CHECK (latitude BETWEEN -90 AND 90),
-  longitude DOUBLE PRECISION CHECK (longitude BETWEEN -180 AND 180),
-  predicted_disease TEXT NOT NULL, confidence INTEGER NOT NULL DEFAULT 0 CHECK (confidence BETWEEN 0 AND 100),
-  validation_label TEXT CHECK (validation_label IN ('confirmed','rejected','uncertain')),
-  actual_disease TEXT, validated_at TIMESTAMPTZ, field_outcome TEXT, weather JSONB, image_reference TEXT
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
-CREATE INDEX IF NOT EXISTS agricultural_cases_user_idx ON public.agricultural_cases(user_id);
-CREATE INDEX IF NOT EXISTS agricultural_cases_created_at_idx ON public.agricultural_cases(created_at DESC);
-CREATE INDEX IF NOT EXISTS agricultural_cases_location_idx ON public.agricultural_cases(location);
-CREATE INDEX IF NOT EXISTS agricultural_cases_crop_idx ON public.agricultural_cases(crop);
-CREATE INDEX IF NOT EXISTS agricultural_cases_disease_idx ON public.agricultural_cases(predicted_disease);
-CREATE INDEX IF NOT EXISTS agricultural_cases_actual_disease_idx ON public.agricultural_cases(actual_disease);
 
-CREATE TABLE IF NOT EXISTS public.weather_observations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id TEXT NOT NULL DEFAULT 'anonymous',
-  observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  latitude DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
-  longitude DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
-  temperature DOUBLE PRECISION NOT NULL, humidity DOUBLE PRECISION NOT NULL CHECK (humidity BETWEEN 0 AND 100),
-  wind_speed DOUBLE PRECISION NOT NULL, rainfall_mm DOUBLE PRECISION NOT NULL DEFAULT 0,
-  source TEXT NOT NULL DEFAULT 'AtisouShield'
-);
-CREATE INDEX IF NOT EXISTS weather_observations_user_idx ON public.weather_observations(user_id);
-CREATE INDEX IF NOT EXISTS weather_observations_observed_at_idx ON public.weather_observations(observed_at DESC);
-CREATE INDEX IF NOT EXISTS weather_observations_coords_idx ON public.weather_observations(latitude,longitude);
-
--- Rend la migration compatible avec une base déjà initialisée.
-ALTER TABLE public.historique_scans ADD COLUMN IF NOT EXISTS image_url TEXT;
-ALTER TABLE public.meteo_records ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS user_id TEXT DEFAULT 'anonymous';
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS crop TEXT DEFAULT 'Non renseigné';
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS location TEXT DEFAULT 'Non renseigné';
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS predicted_disease TEXT;
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS validation_label TEXT;
 ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS actual_disease TEXT;
-ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS validated_at TIMESTAMPTZ;
 ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS field_outcome TEXT;
 ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS weather JSONB;
 ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS image_reference TEXT;
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.agricultural_cases ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_user ON public.agricultural_cases(user_id);
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_created ON public.agricultural_cases(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_location ON public.agricultural_cases(location);
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_crop ON public.agricultural_cases(crop);
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_predicted ON public.agricultural_cases(predicted_disease);
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_actual ON public.agricultural_cases(actual_disease);
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_validation ON public.agricultural_cases(validation_label);
+CREATE INDEX IF NOT EXISTS idx_agricultural_cases_coordinates ON public.agricultural_cases(latitude, longitude);
+
+-- ============================================================
+-- OBSERVATIONS MÉTÉO RECHERCHE
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.weather_observations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+);
+
 ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS user_id TEXT DEFAULT 'anonymous';
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS observed_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS temperature DOUBLE PRECISION;
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS humidity DOUBLE PRECISION;
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS wind_speed DOUBLE PRECISION;
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS rainfall DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS weather JSONB;
+ALTER TABLE public.weather_observations ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
-CREATE OR REPLACE VIEW public.vue_alertes_actives_detail AS
-SELECT a.id,a.titre,a.description,a.niveau,a.pays,a.region,a.icon,a.date_alerte,a.maladie_nom,a.pathogene,
-       z.nom AS zone_nom,z.latitude,z.longitude
-FROM public.alertes_sanitaires a LEFT JOIN public.zones_agricoles z ON a.zone_id=z.id
-WHERE a.active=TRUE ORDER BY a.date_alerte DESC;
+CREATE INDEX IF NOT EXISTS idx_weather_observations_user ON public.weather_observations(user_id);
+CREATE INDEX IF NOT EXISTS idx_weather_observations_observed ON public.weather_observations(observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_weather_observations_coordinates ON public.weather_observations(latitude, longitude);
 
-CREATE OR REPLACE VIEW public.vue_stats_pays AS
-SELECT pays,COUNT(*) AS total_alertes,
- COUNT(*) FILTER (WHERE niveau='critique') AS alertes_critiques,
- COUNT(*) FILTER (WHERE niveau='eleve') AS alertes_elevees,
- COUNT(*) FILTER (WHERE niveau='modere') AS alertes_moderees,
- COUNT(*) FILTER (WHERE niveau='faible') AS alertes_faibles
-FROM public.alertes_sanitaires WHERE active=TRUE GROUP BY pays;
+-- ============================================================
+-- FONCTION UPDATED_AT
+-- ============================================================
 
-CREATE OR REPLACE VIEW public.vue_derniers_scans AS
-SELECT user_id,COUNT(*) AS total_scans,MAX(date_scan) AS dernier_scan,COUNT(DISTINCT maladie_detectee) AS maladies_differentes
-FROM public.historique_scans GROUP BY user_id;
+CREATE OR REPLACE FUNCTION public.update_timestamp()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
 
-CREATE OR REPLACE VIEW public.vue_zones_alertes AS
-SELECT z.id,z.nom,z.pays,z.region,z.latitude,z.longitude,COUNT(a.id) AS nombre_alertes,MAX(a.date_alerte) AS derniere_alerte
-FROM public.zones_agricoles z LEFT JOIN public.alertes_sanitaires a ON z.id=a.zone_id AND a.active=TRUE
-GROUP BY z.id,z.nom,z.pays,z.region,z.latitude,z.longitude;
+DROP TRIGGER IF EXISTS trg_utilisateurs_updated_at ON public.utilisateurs;
+CREATE TRIGGER trg_utilisateurs_updated_at
+BEFORE UPDATE ON public.utilisateurs
+FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
-CREATE OR REPLACE VIEW public.vue_recherche_cas AS
-SELECT COUNT(*) AS total_cases,
- COUNT(*) FILTER (WHERE validation_label='confirmed') AS confirmed,
- COUNT(*) FILTER (WHERE validation_label='rejected') AS rejected,
- COUNT(*) FILTER (WHERE validation_label='uncertain') AS uncertain,
- COUNT(*) FILTER (WHERE actual_disease IS NOT NULL AND validation_label IN ('confirmed','rejected')) AS evaluated_cases
+DROP TRIGGER IF EXISTS trg_zones_agricoles_updated_at ON public.zones_agricoles;
+CREATE TRIGGER trg_zones_agricoles_updated_at
+BEFORE UPDATE ON public.zones_agricoles
+FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
+DROP TRIGGER IF EXISTS trg_alertes_sanitaires_updated_at ON public.alertes_sanitaires;
+CREATE TRIGGER trg_alertes_sanitaires_updated_at
+BEFORE UPDATE ON public.alertes_sanitaires
+FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
+DROP TRIGGER IF EXISTS trg_historique_scans_updated_at ON public.historique_scans;
+CREATE TRIGGER trg_historique_scans_updated_at
+BEFORE UPDATE ON public.historique_scans
+FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
+DROP TRIGGER IF EXISTS trg_agricultural_cases_updated_at ON public.agricultural_cases;
+CREATE TRIGGER trg_agricultural_cases_updated_at
+BEFORE UPDATE ON public.agricultural_cases
+FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
+-- ============================================================
+-- VUES
+-- ============================================================
+
+DROP VIEW IF EXISTS public.vue_alertes_actives_detail CASCADE;
+CREATE VIEW public.vue_alertes_actives_detail AS
+SELECT
+  a.id,
+  a.maladie,
+  a.culture,
+  a.niveau,
+  a.description,
+  a.date_debut,
+  a.date_fin,
+  a.active,
+  z.id AS zone_id,
+  z.nom AS zone,
+  z.departement,
+  z.commune,
+  z.latitude,
+  z.longitude
+FROM public.alertes_sanitaires a
+LEFT JOIN public.zones_agricoles z ON z.id = a.zone_id
+WHERE a.active = TRUE;
+
+DROP VIEW IF EXISTS public.vue_stats_pays CASCADE;
+CREATE VIEW public.vue_stats_pays AS
+SELECT
+  COUNT(*) AS total_scans,
+  COUNT(*) FILTER (WHERE maladie_detectee IS NOT NULL) AS scans_avec_maladie,
+  AVG(confiance) AS confiance_moyenne,
+  COUNT(DISTINCT culture) AS cultures_differentes,
+  COUNT(DISTINCT localisation) AS localisations_differentes
+FROM public.historique_scans;
+
+DROP VIEW IF EXISTS public.vue_derniers_scans CASCADE;
+CREATE VIEW public.vue_derniers_scans AS
+SELECT
+  id,
+  user_id,
+  culture,
+  maladie_detectee,
+  confiance,
+  latitude,
+  longitude,
+  localisation,
+  resultat,
+  traitement_recommande,
+  created_at
+FROM public.historique_scans
+ORDER BY created_at DESC;
+
+DROP VIEW IF EXISTS public.vue_zones_alertes CASCADE;
+CREATE VIEW public.vue_zones_alertes AS
+SELECT
+  z.id,
+  z.nom,
+  z.departement,
+  z.commune,
+  z.latitude,
+  z.longitude,
+  COUNT(a.id) AS nombre_alertes
+FROM public.zones_agricoles z
+LEFT JOIN public.alertes_sanitaires a
+  ON a.zone_id = z.id
+ AND a.active = TRUE
+GROUP BY z.id, z.nom, z.departement, z.commune, z.latitude, z.longitude;
+
+DROP VIEW IF EXISTS public.vue_recherche_cas CASCADE;
+CREATE VIEW public.vue_recherche_cas AS
+SELECT
+  id,
+  user_id,
+  crop,
+  location,
+  latitude,
+  longitude,
+  predicted_disease,
+  actual_disease,
+  confidence,
+  validation_label,
+  weather,
+  field_outcome,
+  image_reference,
+  created_at,
+  updated_at
 FROM public.agricultural_cases;
 
--- L'API Vercel utilise DATABASE_URL/NEON_DATABASE_URL. Ne jamais exposer cette valeur au navigateur.
+DROP VIEW IF EXISTS public.vue_cas_valides CASCADE;
+CREATE VIEW public.vue_cas_valides AS
+SELECT
+  id,
+  user_id,
+  crop,
+  location,
+  predicted_disease,
+  actual_disease,
+  confidence,
+  validation_label,
+  created_at
+FROM public.agricultural_cases
+WHERE actual_disease IS NOT NULL
+  AND validation_label IN ('confirmed', 'rejected');
+
+DROP VIEW IF EXISTS public.vue_stats_validation CASCADE;
+CREATE VIEW public.vue_stats_validation AS
+SELECT
+  COUNT(*) AS total_cases,
+  COUNT(*) FILTER (WHERE validation_label = 'confirmed') AS confirmed,
+  COUNT(*) FILTER (WHERE validation_label = 'rejected') AS rejected,
+  COUNT(*) FILTER (WHERE validation_label = 'uncertain') AS uncertain,
+  ROUND(
+    (
+      100.0 * COUNT(*) FILTER (WHERE validation_label = 'confirmed')
+      /
+      NULLIF(COUNT(*) FILTER (WHERE validation_label IN ('confirmed','rejected')), 0)
+    )::numeric,
+    2
+  ) AS confirmation_rate,
+  AVG(confidence) AS average_confidence
+FROM public.agricultural_cases;
+
+DROP VIEW IF EXISTS public.vue_stats_par_culture CASCADE;
+CREATE VIEW public.vue_stats_par_culture AS
+SELECT
+  crop,
+  COUNT(*) AS total_cases,
+  COUNT(*) FILTER (WHERE validation_label = 'confirmed') AS confirmed,
+  COUNT(*) FILTER (WHERE validation_label = 'rejected') AS rejected,
+  COUNT(*) FILTER (WHERE validation_label = 'uncertain') AS uncertain,
+  AVG(confidence) AS average_confidence
+FROM public.agricultural_cases
+GROUP BY crop
+ORDER BY total_cases DESC;
+
+DROP VIEW IF EXISTS public.vue_stats_par_maladie CASCADE;
+CREATE VIEW public.vue_stats_par_maladie AS
+SELECT
+  predicted_disease,
+  COUNT(*) AS total_cases,
+  COUNT(*) FILTER (WHERE validation_label = 'confirmed') AS confirmed,
+  COUNT(*) FILTER (WHERE validation_label = 'rejected') AS rejected,
+  COUNT(*) FILTER (WHERE validation_label = 'uncertain') AS uncertain,
+  AVG(confidence) AS average_confidence
+FROM public.agricultural_cases
+GROUP BY predicted_disease
+ORDER BY total_cases DESC;
+
+DROP VIEW IF EXISTS public.vue_stats_par_localisation CASCADE;
+CREATE VIEW public.vue_stats_par_localisation AS
+SELECT
+  location,
+  AVG(latitude) AS latitude,
+  AVG(longitude) AS longitude,
+  COUNT(*) AS total_cases,
+  COUNT(*) FILTER (WHERE validation_label = 'confirmed') AS confirmed,
+  COUNT(*) FILTER (WHERE validation_label = 'rejected') AS rejected,
+  COUNT(*) FILTER (WHERE validation_label = 'uncertain') AS uncertain,
+  AVG(confidence) AS average_confidence
+FROM public.agricultural_cases
+GROUP BY location
+ORDER BY total_cases DESC;
+
+-- ============================================================
+-- NORMALISATION
+-- ============================================================
+
+UPDATE public.agricultural_cases
+SET user_id = 'anonymous'
+WHERE user_id IS NULL;
+
+UPDATE public.weather_observations
+SET user_id = 'anonymous'
+WHERE user_id IS NULL;
+
+COMMIT;
+
+-- ============================================================
+-- VÉRIFICATIONS
+-- ============================================================
+
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+AND table_name IN (
+  'utilisateurs',
+  'zones_agricoles',
+  'alertes_sanitaires',
+  'historique_scans',
+  'meteo_records',
+  'agricultural_cases',
+  'weather_observations'
+)
+ORDER BY table_name;
+
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+AND table_name = 'zones_agricoles'
+ORDER BY ordinal_position;
+
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+AND table_name = 'agricultural_cases'
+ORDER BY ordinal_position;
+
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+AND table_name = 'weather_observations'
+ORDER BY ordinal_position;
+
+SELECT 'ATISOUSHIELD NEON SCHEMA OK' AS status, NOW() AS verified_at;

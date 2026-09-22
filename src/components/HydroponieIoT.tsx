@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 
 type Crop = 'Épices' | 'Tomates' | 'Riz' | 'Autre';
 type Status = 'normal' | 'attention' | 'alerte' | 'inconnu';
@@ -62,7 +62,6 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [form, setForm] = useState<TankForm>(emptyForm);
-  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tanks));
@@ -79,7 +78,7 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
     alerte: tanks.filter((tank) => tank.status === 'alerte').length,
   }), [tanks]);
 
-  const createTank = (event: React.FormEvent) => {
+  const createTank = (event: FormEvent) => {
     event.preventDefault();
     const name = form.name.trim();
     if (!name) return;
@@ -292,9 +291,7 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
                 </div>
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-[11px] text-body-secondary">Aucune connexion physique n’est simulée.</p>
-                  <button onClick={() => setConnected((value) => !value)} className="text-xs text-gold hover:text-[#F4CF67]">
-                    {connected ? 'Déconnecter' : 'Tester la configuration'}
-                  </button>
+
                 </div>
               </div>
 

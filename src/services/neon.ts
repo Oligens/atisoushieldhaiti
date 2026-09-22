@@ -22,3 +22,8 @@ export async function researchRequest<T>(path: string, init: RequestInit = {}): 
   if (!response.ok) throw new Error(payload?.error || 'Erreur de communication avec Neon.');
   return payload as T;
 }
+
+
+export async function iotRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return researchRequest<T>(path, init);
+}

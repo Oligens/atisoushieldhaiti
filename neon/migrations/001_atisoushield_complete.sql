@@ -387,6 +387,53 @@ UPDATE public.weather_observations
 SET user_id = 'anonymous'
 WHERE user_id IS NULL;
 
+
+-- ============================================================
+-- HYDROPONIE & IOT — AXE EXPERIMENTAL
+-- ============================================================
+-- Ces tables sont additives : elles ne modifient ni ne suppriment
+-- les tables du corpus de recherche FRD-BRH existant.
+
+CREATE TABLE IF NOT EXISTS public.hydroponic_tanks (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  crop TEXT NOT NULL DEFAULT 'Autre',
+  location TEXT NOT NULL DEFAULT 'Emplacement non renseigné',
+  sensor_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hydroponic_tanks_user ON public.hydroponic_tanks(user_id);
+CREATE INDEX IF NOT EXISTS idx_hydroponic_tanks_sensor ON public.hydroponic_tanks(sensor_id);
+CREATE INDEX IF NOT EXISTS idx_hydroponic_tanks_updated ON public.hydroponic_tanks(updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.iot_readings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tank_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  observed_at TIMESTAMPTZ NOT NULL,
+  ph DOUBLE PRECISION,
+  ec DOUBLE PRECISION,
+  water_temperature DOUBLE PRECISION,
+  air_temperature DOUBLE PRECISION,
+  humidity DOUBLE PRECISION,
+  water_level DOUBLE PRECISION,
+  dissolved_oxygen DOUBLE PRECISION,
+  raw_payload JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_iot_readings_tank_observed ON public.iot_readings(tank_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_iot_readings_device_observed ON public.iot_readings(device_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_iot_readings_observed ON public.iot_readings(observed_at DESC);
+
+DROP TRIGGER IF EXISTS trg_hydroponic_tanks_updated_at ON public.hydroponic_tanks;
+CREATE TRIGGER trg_hydroponic_tanks_updated_at
+BEFORE UPDATE ON public.hydroponic_tanks
+FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
 COMMIT;
 
 -- ============================================================

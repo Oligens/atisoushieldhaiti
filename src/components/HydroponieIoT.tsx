@@ -156,7 +156,7 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
     setSaving(true);
     setError(null);
     try {
-      await iotRequest<{ deleted: string }(`/api/iot?resource=tanks&tankId=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await iotRequest<{ deleted: string }>(`/api/iot?resource=tanks&tankId=${encodeURIComponent(id)}`, { method: 'DELETE' });
       setTanks((current) => current.filter((tank) => tank.id !== id));
       if (selectedId === id) setSelectedId(null);
     } catch (err) {

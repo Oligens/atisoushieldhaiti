@@ -68,9 +68,6 @@ String isoTimestamp() {
   strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
   return String(buffer);
 }
-  if (WiFi.status() == WL_CONNECTED) {
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  }
 
 void connectWiFi() {
   WiFi.mode(WIFI_STA);
@@ -79,6 +76,9 @@ void connectWiFi() {
   const uint32_t deadline = millis() + 20000;
   while (WiFi.status() != WL_CONNECTED && millis() < deadline) {
     delay(250);
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
   }
 }
 

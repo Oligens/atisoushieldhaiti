@@ -1,4 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { iotRequest } from '../services/neon';
 
 type Crop = 'Épices' | 'Tomates' | 'Riz' | 'Autre';
 type Status = 'normal' | 'attention' | 'alerte' | 'inconnu';
@@ -15,6 +16,8 @@ interface HydroponicTank {
   waterTemp: number | null;
   airTemp: number | null;
   humidity: number | null;
+  waterLevel: number | null;
+  dissolvedOxygen: number | null;
   status: Status;
   lastUpdate: string | null;
 }
@@ -26,46 +29,88 @@ interface TankForm {
   sensorId: string;
 }
 
-const STORAGE_KEY = 'atisoushield_hydroponic_tanks';
+interface TankApiRow {
+  id: string;
+  name: string;
+  crop: Crop;
+  location: string;
+  sensor_id: string | null;
+  created_at: string;
+  last_update: string | null;
+  ph: number | null;
+  ec: number | null;
+  water_temp: number | null;
+  air_temp: number | null;
+  humidity: number | null;
+  water_level: number | null;
+  dissolved_oxygen: number | null;
+}
 
 const statusConfig: Record<Status, { label: string; icon: string; className: string }> = {
-  normal: { label: 'Normal', icon: 'fa-circle-check', className: 'text-[#D4AF37] border-[#D4AF37]/40' },
-  attention: { label: 'Attention', icon: 'fa-triangle-exclamation', className: 'text-orange-400 border-orange-400/40' },
-  alerte: { label: 'Alerte', icon: 'fa-circle-exclamation', className: 'text-red-400 border-red-400/50' },
+  normal: { label: 'Données reçues', icon: 'fa-circle-check', className: 'text-[#D4AF37] border-[#D4AF37]/40' },
+  attention: { label: 'À examiner', icon: 'fa-triangle-exclamation', className: 'text-orange-400 border-orange-400/40' },
+  alerte: { label: 'Anomalie', icon: 'fa-circle-exclamation', className: 'text-red-400 border-red-400/50' },
   inconnu: { label: 'Aucune donnée', icon: 'fa-circle-question', className: 'text-body-secondary border-cyber-border' },
 };
 
 const emptyForm: TankForm = { name: '', crop: 'Tomates', location: '', sensorId: '' };
 
-function getStoredTanks(): HydroponicTank[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+function toTank(row: TankApiRow): HydroponicTank {
+  const hasReading = row.last_update !== null;
+  return {
+    id: row.id,
+    name: row.name,
+    crop: row.crop,
+    location: row.location,
+    sensorId: row.sensor_id ?? '',
+    createdAt: row.created_at,
+    ph: row.ph ?? null,
+    ec: row.ec ?? null,
+    waterTemp: row.water_temp ?? null,
+    airTemp: row.air_temp ?? null,
+    humidity: row.humidity ?? null,
+    waterLevel: row.water_level ?? null,
+    dissolvedOxygen: row.dissolved_oxygen ?? null,
+    status: hasReading ? 'normal' : 'inconnu',
+    lastUpdate: row.last_update ?? null,
+  };
 }
 
 function formatMetric(value: number | null, unit = '') {
   return value === null ? '—' : `${value.toFixed(1)}${unit ? ` ${unit}` : ''}`;
 }
 
-function statusFromMetrics(tank: HydroponicTank): Status {
-  if ([tank.ph, tank.ec, tank.waterTemp, tank.airTemp, tank.humidity].every((value) => value === null)) return 'inconnu';
-  return 'normal';
-}
-
 export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
-  const [tanks, setTanks] = useState<HydroponicTank[]>(getStoredTanks);
+  const [tanks, setTanks] = useState<HydroponicTank[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [form, setForm] = useState<TankForm>(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadTanks = useCallback(async () => {
+    setError(null);
+    try {
+      const rows = await iotRequest<TankApiRow[]>('/api/iot?resource=tanks');
+      setTanks(rows.map(toTank));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de charger les bacs depuis Neon.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tanks));
-  }, [tanks]);
+    void loadTanks();
+    const refreshOnFocus = () => void loadTanks();
+    window.addEventListener('focus', refreshOnFocus);
+    window.addEventListener('online', refreshOnFocus);
+    return () => {
+      window.removeEventListener('focus', refreshOnFocus);
+      window.removeEventListener('online', refreshOnFocus);
+    };
+  }, [loadTanks]);
 
   const selected = useMemo(
     () => tanks.find((tank) => tank.id === selectedId) ?? tanks[0] ?? null,
@@ -73,49 +118,60 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
   );
 
   const counts = useMemo(() => ({
-    normal: tanks.filter((tank) => tank.status === 'normal').length,
-    attention: tanks.filter((tank) => tank.status === 'attention').length,
-    alerte: tanks.filter((tank) => tank.status === 'alerte').length,
+    received: tanks.filter((tank) => tank.lastUpdate !== null).length,
+    unknown: tanks.filter((tank) => tank.lastUpdate === null).length,
   }), [tanks]);
 
-  const createTank = (event: FormEvent) => {
+  const createTank = async (event: FormEvent) => {
     event.preventDefault();
     const name = form.name.trim();
-    if (!name) return;
+    if (!name || saving) return;
 
-    const tank: HydroponicTank = {
-      id: `BAC-${Date.now().toString(36).toUpperCase()}`,
-      name,
-      crop: form.crop,
-      location: form.location.trim() || 'Emplacement non renseigné',
-      sensorId: form.sensorId.trim(),
-      createdAt: new Date().toISOString(),
-      ph: null,
-      ec: null,
-      waterTemp: null,
-      airTemp: null,
-      humidity: null,
-      status: 'inconnu',
-      lastUpdate: null,
-    };
-
-    setTanks((current) => [...current, tank]);
-    setSelectedId(tank.id);
-    setForm(emptyForm);
-    setShowCreateForm(false);
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await iotRequest<TankApiRow>('/api/iot?resource=tanks', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          crop: form.crop,
+          location: form.location.trim(),
+          sensorId: form.sensorId.trim() || null,
+        }),
+      });
+      const tank = toTank(created);
+      setTanks((current) => [tank, ...current]);
+      setSelectedId(tank.id);
+      setForm(emptyForm);
+      setShowCreateForm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer le bac dans Neon.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const deleteTank = (id: string) => {
-    setTanks((current) => current.filter((tank) => tank.id !== id));
-    if (selectedId === id) setSelectedId(null);
+  const deleteTank = async (id: string) => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await iotRequest<{ deleted: string }(`/api/iot?resource=tanks&tankId=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      setTanks((current) => current.filter((tank) => tank.id !== id));
+      if (selectedId === id) setSelectedId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer le bac.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const metricCards = selected ? [
-    { label: 'pH', value: formatMetric(selected.ph), icon: 'fa-droplet', note: 'En attente de la sonde pH' },
-    { label: 'Conductivité EC', value: formatMetric(selected.ec, 'mS/cm'), icon: 'fa-flask', note: 'En attente de la sonde EC' },
-    { label: 'Température eau', value: formatMetric(selected.waterTemp, '°C'), icon: 'fa-temperature-half', note: 'En attente du capteur eau' },
-    { label: 'Température air', value: formatMetric(selected.airTemp, '°C'), icon: 'fa-wind', note: 'En attente du capteur air' },
-    { label: 'Humidité air', value: formatMetric(selected.humidity, '%'), icon: 'fa-cloud', note: 'En attente du capteur humidité' },
+    { label: 'pH', value: formatMetric(selected.ph), icon: 'fa-droplet', note: 'Mesure réelle uniquement' },
+    { label: 'Conductivité EC', value: formatMetric(selected.ec, 'mS/cm'), icon: 'fa-flask', note: 'Mesure réelle uniquement' },
+    { label: 'Température eau', value: formatMetric(selected.waterTemp, '°C'), icon: 'fa-temperature-half', note: 'Mesure réelle uniquement' },
+    { label: 'Température air', value: formatMetric(selected.airTemp, '°C'), icon: 'fa-wind', note: 'Mesure réelle uniquement' },
+    { label: 'Humidité air', value: formatMetric(selected.humidity, '%'), icon: 'fa-cloud', note: 'Mesure réelle uniquement' },
   ] : [];
 
   return (
@@ -129,19 +185,30 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
             </div>
             <h2 className="text-2xl md:text-3xl font-bold gradient-text">Hydroponie &amp; IoT</h2>
             <p className="text-body-secondary mt-1 max-w-3xl">
-              Créez vos propres bacs et connectez progressivement leurs capteurs. Aucune mesure n’est inventée tant qu’un dispositif réel n’est pas connecté.
+              Les bacs et les mesures sont stockés dans Neon. Aucune mesure n’est inventée tant qu’un dispositif réel n’a pas transmis de données.
             </p>
           </div>
-          <button onClick={() => setShowCreateForm(true)} className="cyber-button rounded-xl px-5 py-3 font-semibold whitespace-nowrap">
-            <i className="fa-solid fa-plus mr-2"></i>Créer un bac
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => void loadTanks()} disabled={loading || saving} className="px-4 py-3 rounded-xl border border-[#D4AF37]/30 text-body disabled:opacity-50">
+              <i className="fa-solid fa-rotate mr-2"></i>Actualiser
+            </button>
+            <button onClick={() => setShowCreateForm(true)} className="cyber-button rounded-xl px-5 py-3 font-semibold whitespace-nowrap">
+              <i className="fa-solid fa-plus mr-2"></i>Créer un bac
+            </button>
+          </div>
         </header>
+
+        {error && (
+          <div className="glass-panel rounded-2xl p-4 border border-red-400/30 text-red-300">
+            <i className="fa-solid fa-circle-exclamation mr-2"></i>{error}
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-3">
           {[
             ['Bacs créés', tanks.length, 'fa-layer-group'],
-            ['Données reçues', tanks.filter((tank) => tank.lastUpdate).length, 'fa-signal'],
-            ['À surveiller', counts.attention + counts.alerte, 'fa-triangle-exclamation'],
+            ['Données reçues', counts.received, 'fa-signal'],
+            ['Sans mesure', counts.unknown, 'fa-circle-question'],
           ].map(([label, value, icon]) => (
             <div key={String(label)} className="glass-panel rounded-2xl p-4">
               <i className={`fa-solid ${icon} text-[#D4AF37] mb-2`}></i>
@@ -156,7 +223,7 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h3 className="text-lg font-bold text-body">Créer un bac hydroponique</h3>
-                <p className="text-xs text-body-secondary mt-1">Les mesures resteront vides jusqu’à la connexion d’un capteur réel.</p>
+                <p className="text-xs text-body-secondary mt-1">Le bac sera créé dans Neon. Les mesures resteront vides jusqu’à la connexion d’un capteur réel.</p>
               </div>
               <button onClick={() => setShowCreateForm(false)} className="text-body-secondary hover:text-gold" aria-label="Fermer">
                 <i className="fa-solid fa-xmark"></i>
@@ -183,7 +250,9 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
               </label>
               <div className="md:col-span-2 flex justify-end gap-3">
                 <button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2 rounded-xl text-body-secondary hover:text-gold">Annuler</button>
-                <button type="submit" className="cyber-button rounded-xl px-5 py-2.5 font-semibold">Enregistrer le bac</button>
+                <button type="submit" disabled={saving} className="cyber-button rounded-xl px-5 py-2.5 font-semibold disabled:opacity-50">
+                  {saving ? 'Enregistrement…' : 'Enregistrer le bac'}
+                </button>
               </div>
             </form>
           </div>
@@ -195,13 +264,13 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
             {tanks.length > 0 && <span className="text-xs text-body-secondary">{tanks.length} bac{tanks.length > 1 ? 's' : ''}</span>}
           </div>
 
-          {tanks.length === 0 ? (
+          {loading ? (
+            <div className="glass-panel rounded-2xl p-8 text-center text-body-secondary">Chargement des bacs depuis Neon…</div>
+          ) : tanks.length === 0 ? (
             <div className="glass-panel rounded-2xl p-8 md:p-12 text-center border-dashed border-[#D4AF37]/30">
               <i className="fa-solid fa-seedling text-4xl text-[#D4AF37] mb-4"></i>
               <h3 className="text-xl font-bold text-body">Aucun bac configuré</h3>
-              <p className="text-body-secondary max-w-xl mx-auto mt-2">
-                Votre espace est vierge. Créez votre premier bac pour commencer à préparer son suivi IoT.
-              </p>
+              <p className="text-body-secondary max-w-xl mx-auto mt-2">Votre espace est vierge. Créez votre premier bac pour commencer à préparer son suivi IoT.</p>
               <button onClick={() => setShowCreateForm(true)} className="cyber-button rounded-xl px-5 py-3 mt-5 font-semibold">
                 <i className="fa-solid fa-plus mr-2"></i>Créer mon premier bac
               </button>
@@ -232,7 +301,7 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
                     </button>
                     <div className="flex items-center justify-between mt-4 pt-3 border-t border-cyber-border">
                       <span className="text-[11px] text-body-secondary">{tank.sensorId ? `Capteur : ${tank.sensorId}` : 'Aucun capteur associé'}</span>
-                      <button onClick={() => deleteTank(tank.id)} className="text-xs text-red-400 hover:text-red-300" aria-label={`Supprimer ${tank.name}`}>
+                      <button onClick={() => void deleteTank(tank.id)} disabled={saving} className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50" aria-label={`Supprimer ${tank.name}`}>
                         <i className="fa-solid fa-trash mr-1"></i>Supprimer
                       </button>
                     </div>
@@ -273,15 +342,15 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
                   </div>
                   <div>
                     <h3 className="font-bold text-body">Passerelle de communication</h3>
-                    <p className="text-xs text-body-secondary">ESP32 / Arduino → API → base de données</p>
+                    <p className="text-xs text-body-secondary">ESP32 → HTTPS → /api/iot → Neon</p>
                   </div>
                 </div>
                 <div className="space-y-2 text-sm">
                   {[
                     ['Microcontrôleur', selected.sensorId || 'Non configuré', 'fa-microchip'],
-                    ['Transport', 'À configurer', 'fa-tower-broadcast'],
-                    ['API', 'À connecter', 'fa-code'],
-                    ['Stockage', 'À connecter', 'fa-database'],
+                    ['Transport', 'HTTPS', 'fa-tower-broadcast'],
+                    ['API', '/api/iot', 'fa-code'],
+                    ['Stockage', 'Neon PostgreSQL', 'fa-database'],
                   ].map(([label, value, icon]) => (
                     <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-[#D4AF37]/15 px-3 py-2.5">
                       <span className="text-body-secondary"><i className={`fa-solid ${icon} text-[#D4AF37] mr-2`}></i>{label}</span>
@@ -289,10 +358,7 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-[11px] text-body-secondary">Aucune connexion physique n’est simulée.</p>
-
-                </div>
+                <p className="text-[11px] text-body-secondary mt-4">Aucune connexion physique n’est simulée dans l’application.</p>
               </div>
 
               <div className="glass-panel rounded-2xl p-5">
@@ -303,18 +369,14 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
                     {selected.lastUpdate ? `Dernière donnée reçue : ${new Date(selected.lastUpdate).toLocaleString('fr-FR')}` : 'Aucune donnée capteur reçue pour ce bac.'}
                   </span>
                 </div>
-                <p className="text-[11px] text-body-secondary mt-4">
-                  Les seuils et recommandations agronomiques devront être définis et validés dans le cadre expérimental avant toute interprétation automatique.
-                </p>
+                <p className="text-[11px] text-body-secondary mt-4">Les seuils et recommandations agronomiques devront être définis et validés expérimentalement avant toute interprétation automatique. Le prototype ne commande pas automatiquement de produit, d’eau ou de relais.</p>
               </div>
             </div>
           </>
         )}
 
         {!isDesktop && tanks.length > 0 && (
-          <p className="text-center text-[11px] text-body-secondary pb-2">
-            Les capteurs réels pourront être associés à chaque bac lors de l’étape d’intégration IoT.
-          </p>
+          <p className="text-center text-[11px] text-body-secondary pb-2">Les données affichées proviennent uniquement de Neon et des mesures IoT réellement reçues.</p>
         )}
       </div>
     </section>

@@ -9,10 +9,11 @@ import ChemicalSafety from './components/ChemicalSafety';
 import LocationAnalysis from './components/LocationAnalysis';
 import Settings from './components/Settings';
 import ResearchMode from './components/ResearchMode';
+import HydroponieIoT from './components/HydroponieIoT';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 
-export type Screen = 'dashboard' | 'assistant' | 'scanner' | 'safety' | 'location' | 'research' | 'settings';
+export type Screen = 'dashboard' | 'assistant' | 'scanner' | 'safety' | 'location' | 'research' | 'hydroponie' | 'settings';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
@@ -38,6 +39,7 @@ function AppContent() {
       case 'safety': return <ChemicalSafety isDesktop={isDesktop} />;
       case 'location': return <LocationAnalysis isDesktop={isDesktop} />;
       case 'research': return <ResearchMode isDesktop={isDesktop} />;
+      case 'hydroponie': return <HydroponieIoT isDesktop={isDesktop} />;
       case 'settings': return <Settings isDesktop={isDesktop} />;
       default: return <Dashboard onNavigate={setActiveScreen} isDesktop={isDesktop} />;
     }

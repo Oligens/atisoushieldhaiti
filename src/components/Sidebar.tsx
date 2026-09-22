@@ -10,6 +10,7 @@ const navItems: { id: Screen; icon: string; label: string }[] = [
   { id: 'dashboard', icon: 'fa-house', label: 'Tableau de bord' },
   { id: 'location', icon: 'fa-map-location-dot', label: 'Analyse de lieu' },
   { id: 'research', icon: 'fa-flask', label: 'Mode Recherche' },
+  { id: 'hydroponie', icon: 'fa-seedling', label: 'Hydroponie & IoT' },
   { id: 'assistant', icon: 'fa-comments', label: 'Assistant IA' },
   { id: 'scanner', icon: 'fa-camera', label: 'Scanner' },
   { id: 'safety', icon: 'fa-shield-halved', label: 'Guide biopesticides' },
@@ -33,7 +34,7 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-hide">
         {navItems.map((item) => (
           <button
             key={item.id}

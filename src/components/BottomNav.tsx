@@ -9,6 +9,7 @@ const navItems: { id: Screen; icon: string; label: string }[] = [
   { id: 'dashboard', icon: 'fa-house', label: 'Accueil' },
   { id: 'location', icon: 'fa-map-location-dot', label: 'Lieu' },
   { id: 'research', icon: 'fa-flask', label: 'Recherche' },
+  { id: 'hydroponie', icon: 'fa-seedling', label: 'Hydroponie' },
   { id: 'assistant', icon: 'fa-comments', label: 'IA' },
   { id: 'scanner', icon: 'fa-camera', label: 'Scanner' },
   { id: 'settings', icon: 'fa-gear', label: 'Réglages' },
@@ -26,17 +27,17 @@ export default function BottomNav({ active, onNavigate }: BottomNavProps) {
         </div>
       </div>
       
-      <div className="flex justify-around items-center py-2 px-2">
+      <div className="flex overflow-x-auto justify-start md:justify-around items-center py-2 px-2 scrollbar-hide">
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
-            className={`flex flex-col items-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 ${
+            className={`flex flex-col items-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-[64px] ${
               active === item.id ? 'glass-panel neon-border-cyan text-gold text-glow-cyan scale-105' : 'text-body-secondary hover:text-gold'
             }`}
           >
             <i className={`fa-solid ${item.icon} text-lg icon-gold`}></i>
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <span className="text-[10px] font-medium whitespace-nowrap">{item.label}</span>
           </button>
         ))}
       </div>

@@ -2,6 +2,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <time.h>
 #include <DHT.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -58,6 +59,19 @@ bool readWaterLevel(float& value) {
   return false;
 }
 
+String isoTimestamp() {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return "";
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  char buffer[25];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+  return String(buffer);
+}
+  if (WiFi.status() == WL_CONNECTED) {
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  }
+
 void connectWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -88,10 +102,12 @@ bool sendReading() {
   const bool hasHumidity = !isnan(humidity);
   const bool hasWaterTemperature = waterTemperature != DEVICE_DISCONNECTED_C;
 
+  const String timestamp = isoTimestamp();
+  if (timestamp.isEmpty()) return false;
   JsonDocument document;
   document["deviceId"] = DEVICE_ID;
   document["tankId"] = TANK_ID;
-  document["timestamp"] = "SET_BY_DEVICE";
+  document["timestamp"] = timestamp;
 
   if (hasPH) document["ph"] = ph; else document["ph"] = nullptr;
   if (hasEC) document["ec"] = ec; else document["ec"] = nullptr;
@@ -101,9 +117,6 @@ bool sendReading() {
   if (hasWaterLevel) document["waterLevel"] = waterLevel; else document["waterLevel"] = nullptr;
   document["dissolvedOxygen"] = nullptr;
 
-  // L'API exige un timestamp ISO 8601. Remplacer cette fonction
-  // par une horloge synchronisée NTP avant utilisation réelle.
-  document["timestamp"] = "2026-09-22T17:00:00Z";
 
   String payload;
   serializeJson(document, payload);

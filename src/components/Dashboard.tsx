@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Screen } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { getCurrentPosition, getWeatherData, LocationData, WeatherData } from '../services/geolocation';
@@ -12,11 +12,9 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
   const { user } = useAuth();
   const [location, setLocation] = useState<LocationData | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);
-
-  useEffect(() => { loadDashboardData(); }, []);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -26,44 +24,14 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
       setLocation(pos);
       const weatherData = await getWeatherData(pos.latitude, pos.longitude);
       setWeather(weatherData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Données météo momentanément indisponibles.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  if (loading) {
-    return (
-      <div className={isDesktop ? 'p-8' : 'pt-14 pb-20 px-4'}>
-        <div className="flex flex-col items-center justify-center min-h-[400px]">
-          <div className="relative">
-            <div className="w-20 h-20 border-2 border-neon-cyan/30 rounded-full animate-ping absolute"></div>
-            <div className="w-16 h-16 border-4 border-neon-cyan border-t-transparent rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center"><span className="text-2xl">🌱</span></div>
-          </div>
-          <p className="text-sm text-neon-cyan mt-6 text-glow-cyan">INITIALISATION DU SYSTÈME...</p>
-          <p className="text-xs text-body-secondary mt-2">Chargement des données agricoles</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={isDesktop ? 'p-8' : 'pt-14 pb-20 px-4'}>
-        <div className="glass-panel neon-border-amber rounded-2xl p-6 text-center">
-          <span className="text-4xl mb-3 block">📍</span>
-          <h2 className="text-lg font-bold text-neon-amber mb-2 text-glow-amber">GÉOLOCALISATION REQUISE</h2>
-          <p className="text-sm text-body mb-4">{error}</p>
-          <button onClick={loadDashboardData} className="cyber-button-alert rounded-lg px-6 py-2 font-medium">
-            <i className="fa-solid fa-location-crosshairs mr-2"></i>Activer la géolocalisation
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const quickActions = [
+  const quickActions = [  const quickActions = [
     { id: 'scanner', icon: '📸', label: 'Scanner une plante', description: 'Diagnostic instantané', screen: 'scanner' as Screen, glow: 'neon-border-green' },
     { id: 'assistant', icon: '💬', label: 'Discuter avec l\'IA', description: 'Posez vos questions', screen: 'assistant' as Screen, glow: 'neon-border-cyan' },
     { id: 'location', icon: '🗺️', label: 'Analyser un lieu', description: 'Conditions & prévisions', screen: 'location' as Screen, glow: 'neon-border-cyan' },
@@ -72,6 +40,14 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
   if (isDesktop) {
     return (
       <div className="p-8 animate-fade-in">
+        <section className="glass-panel rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-body-secondary">
+            {loading ? 'Chargement des données météo…' : weather && location ? `Météo disponible • ${location.region || 'Position actuelle'}` : error || 'La géolocalisation est facultative. Activez-la pour afficher la météo locale.'}
+          </div>
+          <button type="button" onClick={loadDashboardData} disabled={loading} className="cyber-button rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+            <i className={`fa-solid ${loading ? 'fa-spinner fa-spin' : 'fa-location-crosshairs'} mr-2`}></i>{loading ? 'Chargement…' : 'Charger ma météo'}
+          </button>
+        </section>
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold gradient-text">SYSTÈME ATISOUSHIELD</h1>
@@ -182,6 +158,12 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
 
   return (
     <div className="px-4 pt-14 pb-6 animate-fade-in">
+      <section className="glass-panel rounded-xl p-3 mb-5 flex items-center justify-between gap-3">
+        <p className="text-xs text-body-secondary flex-1">{loading ? 'Chargement météo…' : weather && location ? `Météo : ${location.region || 'Position actuelle'}` : error || 'Météo locale facultative'}</p>
+        <button type="button" onClick={loadDashboardData} disabled={loading} className="cyber-button rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Ma météo'}
+        </button>
+      </section>
       <div className="flex justify-end mb-4"><button onClick={() => setShowAbout(true)} className="cyber-button rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2"><i className="fa-solid fa-circle-info"></i>À propos du logiciel</button></div>
       <div className="mb-6">
         <h1 className="text-xl font-bold gradient-text">ATISOUSHIELD</h1>

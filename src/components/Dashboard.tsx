@@ -14,6 +14,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
 
   useEffect(() => { loadDashboardData(); }, []);
 
@@ -78,6 +79,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
               <span className="status-dot status-dot-green"></span>OPÉRATIONNEL • {user?.nom || 'Agriculteur'}
             </p>
           </div>
+          <div className="flex items-center gap-3"><button onClick={() => setShowAbout(true)} className="cyber-button rounded-xl px-4 py-2 text-sm font-semibold flex items-center gap-2"><i className="fa-solid fa-circle-info"></i>À propos du logiciel</button></div>
           <div className="flex items-center gap-4">
             {location && (
               <div className="glass-panel rounded-xl px-4 py-2 flex items-center gap-2 card-hover">
@@ -166,11 +168,22 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
           </div>
         )}
       </div>
+      {showAbout && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="about-software-title" onClick={(event) => { if (event.target === event.currentTarget) setShowAbout(false); }}>
+          <div className="glass-panel neon-border-cyan rounded-2xl p-6 w-full max-w-xl animate-fade-in">
+            <div className="flex items-start justify-between gap-4 mb-3"><div><p className="text-xs text-gold tracking-widest mb-1">PRÉSENTATION DU LOGICIEL</p><h2 id="about-software-title" className="text-xl font-bold gradient-text">À propos d’AtisouShield</h2></div><button type="button" onClick={() => setShowAbout(false)} aria-label="Fermer" className="text-body-secondary hover:text-gold text-2xl leading-none">×</button></div>
+            <p className="text-sm leading-7 text-body-secondary">AtisouShield Haïti est une plateforme d’aide à la décision et de recherche appliquée qui associe analyse phytosanitaire, données agricoles, intelligence artificielle et expérimentation hydroponique. Son ambition est d’étudier comment des outils adaptés au contexte haïtien peuvent contribuer à protéger les cultures, améliorer la productivité et renforcer les revenus et la sécurité alimentaire des ménages.</p>
+            <div className="flex flex-wrap justify-end gap-3 mt-6"><button type="button" onClick={() => setShowAbout(false)} className="rounded-xl px-4 py-2 text-sm border border-cyber-border text-body-secondary">Fermer</button><button type="button" onClick={() => { setShowAbout(false); onNavigate('about'); }} className="cyber-button rounded-xl px-5 py-2 text-sm font-semibold">En savoir plus <i className="fa-solid fa-arrow-right ml-2"></i></button></div>
+          </div>
+        </div>
+      )}
+
     );
   }
 
   return (
     <div className="px-4 pt-14 pb-6 animate-fade-in">
+      <div className="flex justify-end mb-4"><button onClick={() => setShowAbout(true)} className="cyber-button rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2"><i className="fa-solid fa-circle-info"></i>À propos du logiciel</button></div>
       <div className="mb-6">
         <h1 className="text-xl font-bold gradient-text">ATISOUSHIELD</h1>
         <p className="text-xs text-body-secondary mt-1 flex items-center gap-2">
@@ -241,6 +254,16 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
           </div>
         </div>
       )}
+      {showAbout && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="about-software-title" onClick={(event) => { if (event.target === event.currentTarget) setShowAbout(false); }}>
+          <div className="glass-panel neon-border-cyan rounded-2xl p-6 w-full max-w-xl animate-fade-in">
+            <div className="flex items-start justify-between gap-4 mb-3"><div><p className="text-xs text-gold tracking-widest mb-1">PRÉSENTATION DU LOGICIEL</p><h2 id="about-software-title" className="text-xl font-bold gradient-text">À propos d’AtisouShield</h2></div><button type="button" onClick={() => setShowAbout(false)} aria-label="Fermer" className="text-body-secondary hover:text-gold text-2xl leading-none">×</button></div>
+            <p className="text-sm leading-7 text-body-secondary">AtisouShield Haïti est une plateforme d’aide à la décision et de recherche appliquée qui associe analyse phytosanitaire, données agricoles, intelligence artificielle et expérimentation hydroponique. Son ambition est d’étudier comment des outils adaptés au contexte haïtien peuvent contribuer à protéger les cultures, améliorer la productivité et renforcer les revenus et la sécurité alimentaire des ménages.</p>
+            <div className="flex flex-wrap justify-end gap-3 mt-6"><button type="button" onClick={() => setShowAbout(false)} className="rounded-xl px-4 py-2 text-sm border border-cyber-border text-body-secondary">Fermer</button><button type="button" onClick={() => { setShowAbout(false); onNavigate('about'); }} className="cyber-button rounded-xl px-5 py-2 text-sm font-semibold">En savoir plus <i className="fa-solid fa-arrow-right ml-2"></i></button></div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

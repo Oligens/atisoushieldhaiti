@@ -39,6 +39,8 @@ export default async function handler(req: any, res: any) {
     });
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
   let response: Response;
   try {
     response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
@@ -49,9 +51,14 @@ export default async function handler(req: any, res: any) {
         'Api-Revision': '2026-05-20',
       },
       body: JSON.stringify({ model, input }),
+      signal: controller.signal,
     });
-  } catch {
+  } catch (error) {
+    if (controller.signal.aborted) return json(res, 504, { error: 'Gemini dépasse le délai de réponse autorisé. Réessayez avec une question plus courte.' });
+    console.error('Gemini network error:', error);
     return json(res, 502, { error: 'Impossible de joindre le service Gemini. Vérifiez la connexion du serveur.' });
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let payload: any;
@@ -70,15 +77,21 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  const text = Array.isArray(payload?.steps)
-    ? payload.steps
-        .filter((step: any) => step?.type === 'model_output')
-        .flatMap((step: any) => Array.isArray(step.content) ? step.content : [])
-        .filter((part: any) => part?.type === 'text' && typeof part.text === 'string')
-        .map((part: any) => part.text)
-        .join('\n')
-    : '';
+  const text = typeof payload?.output_text === 'string'
+    ? payload.output_text
+    : Array.isArray(payload?.steps)
+      ? payload.steps
+          .filter((step: any) => step?.type === 'model_output')
+          .flatMap((step: any) => Array.isArray(step.content) ? step.content : [])
+          .filter((part: any) => part?.type === 'text' && typeof part.text === 'string')
+          .map((part: any) => part.text)
+          .join('\n')
+      : '';
 
+  if (payload?.status && payload.status !== 'completed') {
+    console.error('Gemini interaction did not complete:', payload.status);
+    return json(res, 502, { error: `Gemini n’a pas terminé la génération (état : ${payload.status}). Réessayez.`, model });
+  }
   if (!text.trim()) {
     console.error('Gemini Interactions API returned no model text:', payload?.status || 'unknown status');
     return json(res, 502, { error: 'Gemini n’a retourné aucun texte. Réessayez avec une question plus précise.', model });

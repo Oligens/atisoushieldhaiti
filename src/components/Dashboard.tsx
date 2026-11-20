@@ -167,8 +167,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
             </div>
           </div>
         )}
-      </div>
-      {showAbout && (
+            {showAbout && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="about-software-title" onClick={(event) => { if (event.target === event.currentTarget) setShowAbout(false); }}>
           <div className="glass-panel neon-border-cyan rounded-2xl p-6 w-full max-w-xl animate-fade-in">
             <div className="flex items-start justify-between gap-4 mb-3"><div><p className="text-xs text-gold tracking-widest mb-1">PRÉSENTATION DU LOGICIEL</p><h2 id="about-software-title" className="text-xl font-bold gradient-text">À propos d’AtisouShield</h2></div><button type="button" onClick={() => setShowAbout(false)} aria-label="Fermer" className="text-body-secondary hover:text-gold text-2xl leading-none">×</button></div>
@@ -177,7 +176,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
           </div>
         </div>
       )}
-
+      </div>
     );
   }
 

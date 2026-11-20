@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
 import { getCurrentPosition, getWeatherData, type LocationData, type WeatherData } from '../services/geolocation';
 import { saveWeatherObservation } from '../services/researchData';
@@ -24,17 +24,23 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const loadWeatherForPlace = async (lat: number, lon: number, address: string, region?: string, country?: string) => {
+  const loadWeatherForPlace = async (lat: number, lon: number, address: string, region?: string, country?: string, details?: { department?: string; commune?: string; street?: string; countryCode?: string; flagEmoji?: string; source?: 'gps' | 'ip' | 'manual'; accuracy?: number }) => {
     setLoadingWeather(true);
     setError(null);
     setWeather(null);
     const selectedLocation: LocationData = {
       latitude: lat,
       longitude: lon,
-      accuracy: 0,
+      accuracy: details?.accuracy || 0,
       address,
       region: region || address.split(',')[0],
+      department: details?.department,
+      commune: details?.commune || region,
+      street: details?.street,
       country: country || 'Non précisé',
+      countryCode: details?.countryCode,
+      flagEmoji: details?.flagEmoji,
+      source: details?.source || 'manual',
       timestamp: Date.now(),
     };
     setLocation(selectedLocation);
@@ -63,7 +69,8 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
         position.longitude,
         position.address || 'Position actuelle',
         position.region,
-        position.country
+        position.country,
+        { department: position.department, commune: position.commune, street: position.street, countryCode: position.countryCode, flagEmoji: position.flagEmoji, source: position.source, accuracy: position.accuracy }
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Position actuelle indisponible. Recherchez un lieu manuellement.');
@@ -71,6 +78,12 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       setLoadingGps(false);
     }
   };
+
+  useEffect(() => {
+    void loadCurrentPosition();
+    // La page tente la géolocalisation automatiquement, sans bloquer la recherche manuelle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const searchPlaces = async (event: FormEvent) => {
     event.preventDefault();
@@ -119,14 +132,22 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       Number(place.lon),
       place.display_name,
       region,
-      address.country
+      address.country,
+      {
+        department: address.state || address.province || address.county,
+        commune: address.city || address.town || address.village || address.municipality || address.county,
+        street: [address.house_number, address.road || address.pedestrian || address.residential].filter(Boolean).join(' '),
+        countryCode: address.country_code?.toUpperCase(),
+        flagEmoji: address.country_code ? String.fromCodePoint(...address.country_code.toUpperCase().split('').map((char: string) => 127397 + char.charCodeAt(0))) : undefined,
+        source: 'manual',
+      }
     );
     setPlaces([]);
     setQuery(place.display_name);
   };
 
   const analysis = weather
-    ? calculateAgriculturalRisk({ temperature: weather.temperature, humidity: weather.humidity, windSpeed: weather.windSpeed })
+    ? calculateAgriculturalRisk({ temperature: weather.temperature, humidity: weather.humidity, windSpeed: weather.windSpeed, rainfallMm: weather.forecast[0]?.precipitation })
     : null;
 
   return (
@@ -199,8 +220,9 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div>
                 <p className="text-xs text-gold mb-1"><i className="fa-solid fa-satellite-dish mr-2"></i>LIEU ANALYSÉ</p>
-                <h2 className="text-xl font-bold text-body mb-1">{location.region}, {location.country}</h2>
-                <p className="text-xs text-body-secondary max-w-2xl">{location.address}</p>
+                <h2 className="text-xl font-bold text-body mb-1">{location.flagEmoji ? location.flagEmoji + ' ' : ''}{location.commune || location.region || 'Lieu sélectionné'}</h2>
+                <p className="text-xs text-body-secondary max-w-2xl">{[location.street, location.commune, location.department, location.country].filter(Boolean).join(' · ') || location.address}</p>
+                <p className="text-[11px] text-body-secondary mt-1">{location.source === 'ip' ? 'Position approximative par réseau — la rue ne peut pas être garantie.' : location.source === 'gps' ? 'Position GPS · précision ±' + Math.round(location.accuracy) + ' m' : 'Lieu sélectionné dans la recherche cartographique'}</p>
                 <p className="text-sm text-body-secondary mt-2">{weather.description}</p>
               </div>
               <div className="sm:text-right">

@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
-import { getCurrentPosition, getWeatherData, type LocationData, type WeatherData } from '../services/geolocation';
+import { getCurrentPosition, getWeatherData, type LocationData, type LocationSource, type WeatherData } from '../services/geolocation';
+import LocationOverview from './LocationOverview';
 import { saveWeatherObservation } from '../services/researchData';
 
 interface LocationAnalysisProps { isDesktop: boolean; }
@@ -24,7 +25,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const loadWeatherForPlace = async (lat: number, lon: number, address: string, region?: string, country?: string) => {
+  const loadWeatherForPlace = async (lat: number, lon: number, address: string, region?: string, country?: string, source: LocationSource = 'search', details?: Partial<LocationData>) => {
     setLoadingWeather(true);
     setError(null);
     setWeather(null);
@@ -35,6 +36,12 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       address,
       region: region || address.split(',')[0],
       country: country || 'Non précisé',
+      source,
+      department: details?.department,
+      commune: details?.commune || region,
+      street: details?.street,
+      countryCode: details?.countryCode,
+      accuracy: details?.accuracy ?? 0,
       timestamp: Date.now(),
     };
     setLocation(selectedLocation);
@@ -63,7 +70,9 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
         position.longitude,
         position.address || 'Position actuelle',
         position.region,
-        position.country
+        position.country,
+        position.source || 'gps',
+        position
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Position actuelle indisponible. Recherchez un lieu manuellement.');
@@ -71,6 +80,10 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       setLoadingGps(false);
     }
   };
+
+  useEffect(() => {
+    void loadCurrentPosition();
+  }, []);
 
   const searchPlaces = async (event: FormEvent) => {
     event.preventDefault();
@@ -119,7 +132,14 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       Number(place.lon),
       place.display_name,
       region,
-      address.country
+      address.country,
+      'search',
+      {
+        department: address.state || address.region || address.county,
+        commune: address.city || address.town || address.village || address.municipality || address.county || region,
+        street: [address.house_number, address.road || address.pedestrian || address.residential].filter(Boolean).join(' ') || undefined,
+        countryCode: address.country_code,
+      }
     );
     setPlaces([]);
     setQuery(place.display_name);
@@ -172,12 +192,12 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
             ))}
           </div>
         )}
-        <p className="text-[11px] text-body-secondary mt-3">Recherche cartographique OpenStreetMap. La position GPS est facultative : vous pouvez analyser un lieu sans autoriser l’accès à votre position.</p>
+        <p className="text-[11px] text-body-secondary mt-3">Recherche cartographique OpenStreetMap. La localisation est tentée automatiquement ; si le GPS n’est pas autorisé, une position IP approximative est utilisée lorsque disponible.</p>
       </section>
 
       {loadingGps && !location && (
         <div className="glass-panel rounded-2xl p-4 mb-5 text-sm text-body-secondary">
-          <i className="fa-solid fa-satellite-dish mr-2 text-[#D4AF37]"></i>Tentative de localisation automatique… Vous pouvez déjà rechercher un lieu ci-dessus.
+          <i className="fa-solid fa-satellite-dish mr-2 text-[#D4AF37]"></i>Tentative de localisation GPS puis, si nécessaire, localisation approximative par Internet… Vous pouvez déjà rechercher un lieu ci-dessus.
         </div>
       )}
       {loadingWeather && (
@@ -209,6 +229,8 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
               </div>
             </div>
           </div>
+
+          <LocationOverview location={location} weather={weather} />
 
           <div className={isDesktop ? 'grid grid-cols-3 gap-6' : 'space-y-4'}>
             <div className={isDesktop ? 'col-span-2 space-y-6' : 'space-y-4'}>

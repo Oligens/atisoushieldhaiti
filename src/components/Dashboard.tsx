@@ -12,11 +12,9 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
   const { user } = useAuth();
   const [location, setLocation] = useState<LocationData | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);
-
-  useEffect(() => { loadDashboardData(); }, []);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -26,42 +24,12 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
       setLocation(pos);
       const weatherData = await getWeatherData(pos.latitude, pos.longitude);
       setWeather(weatherData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'La météo locale est momentanément indisponible.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
-
-  if (loading) {
-    return (
-      <div className={isDesktop ? 'p-8' : 'pt-14 pb-20 px-4'}>
-        <div className="flex flex-col items-center justify-center min-h-[400px]">
-          <div className="relative">
-            <div className="w-20 h-20 border-2 border-neon-cyan/30 rounded-full animate-ping absolute"></div>
-            <div className="w-16 h-16 border-4 border-neon-cyan border-t-transparent rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center"><span className="text-2xl">🌱</span></div>
-          </div>
-          <p className="text-sm text-neon-cyan mt-6 text-glow-cyan">INITIALISATION DU SYSTÈME...</p>
-          <p className="text-xs text-body-secondary mt-2">Chargement des données agricoles</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={isDesktop ? 'p-8' : 'pt-14 pb-20 px-4'}>
-        <div className="glass-panel neon-border-amber rounded-2xl p-6 text-center">
-          <span className="text-4xl mb-3 block">📍</span>
-          <h2 className="text-lg font-bold text-neon-amber mb-2 text-glow-amber">GÉOLOCALISATION REQUISE</h2>
-          <p className="text-sm text-body mb-4">{error}</p>
-          <button onClick={loadDashboardData} className="cyber-button-alert rounded-lg px-6 py-2 font-medium">
-            <i className="fa-solid fa-location-crosshairs mr-2"></i>Activer la géolocalisation
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const quickActions = [
     { id: 'scanner', icon: '📸', label: 'Scanner une plante', description: 'Diagnostic instantané', screen: 'scanner' as Screen, glow: 'neon-border-green' },
@@ -79,7 +47,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
               <span className="status-dot status-dot-green"></span>OPÉRATIONNEL • {user?.nom || 'Agriculteur'}
             </p>
           </div>
-          <div className="flex items-center gap-3"><button onClick={() => setShowAbout(true)} className="cyber-button rounded-xl px-4 py-2 text-sm font-semibold flex items-center gap-2"><i className="fa-solid fa-circle-info"></i>À propos du logiciel</button></div>
+          <div className="flex items-center gap-3"><button onClick={() => void loadDashboardData()} disabled={loading} className="rounded-xl border border-[#D4AF37]/40 px-4 py-2 text-sm font-semibold text-gold disabled:opacity-50"><i className="fa-solid fa-location-crosshairs mr-2"></i>{loading ? 'Localisation…' : 'Ma position'}</button><button onClick={() => setShowAbout(true)} className="cyber-button rounded-xl px-4 py-2 text-sm font-semibold flex items-center gap-2"><i className="fa-solid fa-circle-info"></i>À propos du logiciel</button></div>
           <div className="flex items-center gap-4">
             {location && (
               <div className="glass-panel rounded-xl px-4 py-2 flex items-center gap-2 card-hover">
@@ -99,7 +67,12 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
           </div>
         </div>
 
-        {weather && location && (
+        {(loading || error) && (
+        <div className="glass-panel rounded-xl p-4 mb-5 text-sm" role="status">
+          {loading ? <span className="text-body-secondary"><i className="fa-solid fa-spinner fa-spin mr-2 text-[#D4AF37]"></i>Recherche de votre position et de la météo…</span> : <span className="text-body-secondary"><i className="fa-solid fa-circle-info mr-2 text-[#D4AF37]"></i>{error} Vous pouvez utiliser les autres modules sans activer la géolocalisation.</span>}
+        </div>
+      )}
+      {weather && location && (
           <div className="glass-panel hud-corner neon-border-cyan rounded-2xl p-6 mb-6 animate-glow-pulse">
             <div className="flex items-start justify-between">
               <div>
@@ -182,7 +155,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
 
   return (
     <div className="px-4 pt-14 pb-6 animate-fade-in">
-      <div className="flex justify-end mb-4"><button onClick={() => setShowAbout(true)} className="cyber-button rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2"><i className="fa-solid fa-circle-info"></i>À propos du logiciel</button></div>
+      <div className="flex justify-end gap-2 mb-4"><button onClick={() => void loadDashboardData()} disabled={loading} className="rounded-xl border border-[#D4AF37]/40 px-3 py-2 text-xs font-semibold text-gold disabled:opacity-50"><i className="fa-solid fa-location-crosshairs mr-2"></i>{loading ? 'Localisation…' : 'Ma position'}</button><button onClick={() => setShowAbout(true)} className="cyber-button rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2"><i className="fa-solid fa-circle-info"></i>À propos du logiciel</button></div>
       <div className="mb-6">
         <h1 className="text-xl font-bold gradient-text">ATISOUSHIELD</h1>
         <p className="text-xs text-body-secondary mt-1 flex items-center gap-2">

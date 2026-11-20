@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
 type Crop = 'Épices' | 'Tomates' | 'Riz' | 'Autre';
 type Status = 'normal' | 'attention' | 'alerte' | 'inconnu';

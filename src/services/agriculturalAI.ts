@@ -58,15 +58,29 @@ confidence doit être un entier de 0 à 100. Pour une image ambiguë, utilise un
 }
 
 export async function askAgriculturalAI(prompt: string): Promise<string> {
-  const response = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      mode: 'chat',
-      prompt: `Tu es Atisou, assistant agricole pour Haïti. Réponds en français, de façon claire et prudente. Distingue faits, hypothèses et incertitudes. Privilégie la lutte intégrée et les options biologiques. N'invente ni diagnostic certain, ni dose de pesticide, ni réglementation. Question: ${prompt}`,
-    }),
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload?.error || 'Assistant IA indisponible.');
-  return String(payload.text || 'Je n’ai pas pu produire une réponse.');
-}
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 50000);
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        mode: 'chat',
+        prompt: `Tu es Atisou, assistant agronomique pour Haïti. Réponds en français, avec des explications pratiques, structurées et adaptées aux exploitations haïtiennes. Distingue faits, hypothèses et incertitudes. Privilégie la prévention et la lutte intégrée. N'invente ni diagnostic certain, ni dose de pesticide, ni réglementation. Question de l’utilisateur : ${prompt}`,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || `Le service IA a répondu HTTP ${response.status}.`);
+    const answer = typeof payload?.text === 'string' ? payload.text.trim() : '';
+    if (!answer) throw new Error('Atisou n’a pas reçu de réponse exploitable. Réessayez.');
+    return answer;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('La réponse d’Atisou dépasse 50 secondes. Vérifiez votre connexion puis réessayez.');
+    }
+    throw error instanceof Error ? error : new Error('Assistant IA momentanément indisponible.');
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}}

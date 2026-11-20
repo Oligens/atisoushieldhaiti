@@ -83,4 +83,4 @@ export async function askAgriculturalAI(prompt: string): Promise<string> {
   } finally {
     window.clearTimeout(timeout);
   }
-}}
+}

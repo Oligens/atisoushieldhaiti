@@ -48,11 +48,11 @@ type ReverseAddress = {
   countryCode?: string;
 };
 
-const fetchWithTimeout = async (url: string, timeoutMs: number, headers?: HeadersInit) => {
+const fetchWithTimeout = async (url: string, timeoutMs: number) => {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json', ...headers } });
+    return await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
   } catch (error) {
     if (controller.signal.aborted) throw new Error('Le service de localisation a dépassé le délai autorisé.');
     throw error;
@@ -90,10 +90,11 @@ export async function getCurrentPosition(): Promise<LocationData> {
       }
       return location;
     } catch (error) {
-      gpsError = error instanceof GeolocationPositionError
-        ? new Error(error.code === error.PERMISSION_DENIED
+      const geolocationError = error as GeolocationPositionError;
+      gpsError = typeof error === 'object' && error !== null && 'code' in error
+        ? new Error(geolocationError.code === 1
           ? 'Autorisation GPS refusée.'
-          : error.code === error.TIMEOUT
+          : geolocationError.code === 3
             ? 'Le GPS n’a pas répondu à temps.'
             : 'Position GPS indisponible.')
         : error instanceof Error ? error : new Error('Position GPS indisponible.');

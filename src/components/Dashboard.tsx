@@ -25,7 +25,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
       const weatherData = await getWeatherData(pos.latitude, pos.longitude);
       setWeather(weatherData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'La localisation et la météo sont momentanément indisponibles.');
+      setError(err instanceof Error ? err.message : 'La localisation GPS et les données météo sont momentanément indisponibles.');
     } finally {
       setLoading(false);
     }
@@ -50,7 +50,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
   if (isDesktop) {
     return (
       <div className="p-8 animate-fade-in">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold gradient-text">SYSTÈME ATISOUSHIELD</h1>
             <p className="text-sm text-body-secondary mt-1 flex items-center gap-2">

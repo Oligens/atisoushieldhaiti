@@ -32,7 +32,6 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
     const selectedLocation: LocationData = {
       latitude: lat,
       longitude: lon,
-      accuracy: 0,
       address,
       region: region || address.split(',')[0],
       country: country || 'Non précisé',

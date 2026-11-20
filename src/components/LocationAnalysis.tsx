@@ -123,15 +123,19 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
     setLocation(selectedLocation);
 
     try {
-      const [weatherResult, addressResult] = await Promise.all([
-        getWeatherData(lat, lon),
-        shouldReverseGeocode
-          ? reverseAddress(lat, lon).catch((geocodeError) => {
-              console.warn('Adresse précise indisponible pour ce lieu :', geocodeError);
-              return {} as Record<string, string>;
-            })
-          : Promise.resolve({} as Record<string, string>),
-      ]);
+      const weatherResult = await getWeatherData(lat, lon);
+      if (requestId !== requestSequence.current) return;
+      setWeather(weatherResult);
+      setLoadingWeather(false);
+
+      let addressResult: Record<string, string> = {};
+      if (shouldReverseGeocode) {
+        try {
+          addressResult = await reverseAddress(lat, lon);
+        } catch (geocodeError) {
+          console.warn('Adresse précise indisponible pour ce lieu :', geocodeError);
+        }
+      }
       if (requestId !== requestSequence.current) return;
 
       const resolved = addressDetails(addressResult);
@@ -151,7 +155,6 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
         ),
       };
       setLocation(enrichedLocation);
-      setWeather(weatherResult);
       try {
         await saveWeatherObservation({
           latitude: lat,

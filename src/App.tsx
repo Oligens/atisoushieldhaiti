@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import AboutStudy from './components/AboutStudy';
 import AIAssistant from './components/AIAssistant';
 import PlantScanner from './components/PlantScanner';
 import ChemicalSafety from './components/ChemicalSafety';
@@ -13,7 +14,7 @@ import HydroponieIoT from './components/HydroponieIoT';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 
-export type Screen = 'dashboard' | 'assistant' | 'scanner' | 'safety' | 'location' | 'research' | 'hydroponie' | 'settings';
+export type Screen = 'dashboard' | 'assistant' | 'scanner' | 'safety' | 'location' | 'research' | 'hydroponie' | 'settings' | 'about';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
@@ -41,6 +42,7 @@ function AppContent() {
       case 'research': return <ResearchMode isDesktop={isDesktop} />;
       case 'hydroponie': return <HydroponieIoT isDesktop={isDesktop} />;
       case 'settings': return <Settings isDesktop={isDesktop} />;
+      case 'about': return <AboutStudy isDesktop={isDesktop} onBack={() => setActiveScreen('dashboard')} />;
       default: return <Dashboard onNavigate={setActiveScreen} isDesktop={isDesktop} />;
     }
   };

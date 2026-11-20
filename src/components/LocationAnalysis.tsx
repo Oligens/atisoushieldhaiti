@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
 import { getCurrentPosition, getWeatherData, type LocationData, type WeatherData } from '../services/geolocation';
 import { saveWeatherObservation } from '../services/researchData';
@@ -20,7 +20,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [loadingWeather, setLoadingWeather] = useState(false);
-  const [loadingGps, setLoadingGps] = useState(true);
+  const [loadingGps, setLoadingGps] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -72,10 +72,6 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
     }
   };
 
-  useEffect(() => {
-    void loadCurrentPosition();
-  }, []);
-
   const searchPlaces = async (event: FormEvent) => {
     event.preventDefault();
     const term = query.trim();
@@ -93,8 +89,18 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       url.searchParams.set('addressdetails', '1');
       url.searchParams.set('limit', '6');
       url.searchParams.set('accept-language', 'fr');
-      const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error('Le service de recherche géographique ne répond pas.');
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+      let response: Response;
+      try {
+        response = await fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: controller.signal });
+      } catch (err) {
+        if (controller.signal.aborted) throw new Error('La recherche du lieu a pris trop de temps. Réessayez.');
+        throw err;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+      if (!response.ok) throw new Error(response.status === 429 ? 'Le service cartographique est temporairement saturé. Réessayez dans une minute.' : 'Le service de recherche géographique ne répond pas.');
       const results = await response.json() as PlaceResult[];
       setPlaces(results);
       if (!results.length) setSearchError('Aucun lieu trouvé. Essayez avec une commune, une ville ou un département.');

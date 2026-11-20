@@ -33,7 +33,7 @@ export interface ForecastDay {
 export async function getCurrentPosition(): Promise<LocationData> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error('La géolocalisation n\'est pas supportée'));
+      reject(new Error('La géolocalisation n’est pas disponible sur cet appareil.'));
       return;
     }
 
@@ -43,36 +43,31 @@ export async function getCurrentPosition(): Promise<LocationData> {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy,
+          region: 'Position actuelle',
           timestamp: position.timestamp,
         };
-
+        // L’adresse est enrichie avec un délai court, sans bloquer l’accès aux coordonnées.
         try {
-          const addressData = await reverseGeocode(locationData.latitude, locationData.longitude);
+          const addressData = await Promise.race([
+            reverseGeocode(locationData.latitude, locationData.longitude),
+            new Promise<never>((_, rejectAddress) => window.setTimeout(() => rejectAddress(new Error('Reverse geocoding timeout')), 3500)),
+          ]);
           locationData.address = addressData.address;
           locationData.region = addressData.region;
           locationData.country = addressData.country;
-        } catch (error) {
-          console.warn('Reverse geocoding failed:', error);
+        } catch {
+          // Les coordonnées restent utilisables même si le service d’adresse est lent.
         }
-
         resolve(locationData);
       },
       (error) => {
-        let message = 'Impossible d\'obtenir votre position';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            message = 'Vous avez refusé l\'accès à votre position';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            message = 'Position indisponible';
-            break;
-          case error.TIMEOUT:
-            message = 'Délai d\'attente dépassé';
-            break;
-        }
+        let message = 'Impossible d’obtenir votre position.';
+        if (error.code === error.PERMISSION_DENIED) message = 'Accès à la position refusé. Vous pouvez continuer sans GPS.';
+        else if (error.code === error.POSITION_UNAVAILABLE) message = 'Position GPS indisponible. Réessayez ou utilisez la recherche manuelle.';
+        else if (error.code === error.TIMEOUT) message = 'Le GPS ne répond pas. Vous pouvez continuer sans géolocalisation.';
         reject(new Error(message));
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 }
     );
   });
 }
@@ -83,7 +78,8 @@ async function reverseGeocode(lat: number, lon: number): Promise<{
   country: string;
 }> {
   const response = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=fr`
+    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=fr`,
+    { signal: AbortSignal.timeout(3000), headers: { Accept: 'application/json' } }
   );
   
   if (!response.ok) throw new Error('Reverse geocoding failed');
@@ -116,8 +112,8 @@ export async function getWeatherData(lat: number, lon: number): Promise<WeatherD
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code&timezone=auto&forecast_days=7`;
 
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Weather API failed');
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Service météo indisponible (HTTP ${response.status}).`);
 
     const data = await response.json();
     const current = data.current;

@@ -1,18 +1,20 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
 import { getCurrentPosition, getWeatherData, type LocationData, type WeatherData } from '../services/geolocation';
 import { saveWeatherObservation } from '../services/researchData';
 
 interface LocationAnalysisProps { isDesktop: boolean; }
 interface PlaceResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  type?: string;
-  address?: Record<string, string>;
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  admin1?: string;
+  admin2?: string;
+  country?: string;
+  country_code?: string;
 }
-
+ 
 export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -20,7 +22,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [loadingWeather, setLoadingWeather] = useState(false);
-  const [loadingGps, setLoadingGps] = useState(true);
+  const [loadingGps, setLoadingGps] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -72,10 +74,6 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
     }
   };
 
-  useEffect(() => {
-    void loadCurrentPosition();
-  }, []);
-
   const searchPlaces = async (event: FormEvent) => {
     event.preventDefault();
     const term = query.trim();
@@ -86,37 +84,36 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
     setSearching(true);
     setSearchError(null);
     setPlaces([]);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12000);
     try {
-      const url = new URL('https://nominatim.openstreetmap.org/search');
-      url.searchParams.set('q', term);
-      url.searchParams.set('format', 'jsonv2');
-      url.searchParams.set('addressdetails', '1');
-      url.searchParams.set('limit', '6');
-      url.searchParams.set('accept-language', 'fr');
-      const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error('Le service de recherche géographique ne répond pas.');
-      const results = await response.json() as PlaceResult[];
+      const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
+      url.searchParams.set('name', term);
+      url.searchParams.set('count', '8');
+      url.searchParams.set('language', 'fr');
+      url.searchParams.set('format', 'json');
+      const response = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`Service cartographique indisponible (HTTP ${response.status}).`);
+      const payload = await response.json();
+      const results = Array.isArray(payload.results) ? payload.results as PlaceResult[] : [];
       setPlaces(results);
-      if (!results.length) setSearchError('Aucun lieu trouvé. Essayez avec une commune, une ville ou un département.');
+      if (!results.length) setSearchError('Aucun lieu trouvé. Essayez avec une commune, une ville ou un autre nom.');
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'La recherche du lieu a échoué.');
+      setSearchError(err instanceof DOMException && err.name === 'AbortError'
+        ? 'La recherche du lieu a dépassé 12 secondes. Réessayez.'
+        : err instanceof Error ? err.message : 'La recherche du lieu a échoué.');
     } finally {
+      window.clearTimeout(timeout);
       setSearching(false);
     }
   };
 
   const choosePlace = (place: PlaceResult) => {
-    const address = place.address || {};
-    const region = address.city || address.town || address.village || address.county || address.state;
-    void loadWeatherForPlace(
-      Number(place.lat),
-      Number(place.lon),
-      place.display_name,
-      region,
-      address.country
-    );
+    const region = place.admin2 || place.admin1 || place.name;
+    const address = [place.name, place.admin2, place.admin1, place.country].filter(Boolean).join(', ');
+    void loadWeatherForPlace(place.latitude, place.longitude, address, region, place.country);
     setPlaces([]);
-    setQuery(place.display_name);
+    setQuery(address);
   };
 
   const analysis = weather
@@ -159,9 +156,9 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
         {places.length > 0 && (
           <div className="mt-4 space-y-2" aria-label="Résultats de recherche">
             {places.map((place) => (
-              <button key={place.place_id} type="button" onClick={() => choosePlace(place)} className="w-full text-left rounded-xl border border-[#D4AF37]/20 hover:border-[#D4AF37]/60 p-3 flex items-start gap-3">
+              <button key={place.id} type="button" onClick={() => choosePlace(place)} className="w-full text-left rounded-xl border border-[#D4AF37]/20 hover:border-[#D4AF37]/60 p-3 flex items-start gap-3">
                 <i className="fa-solid fa-location-dot text-[#D4AF37] mt-1"></i>
-                <span className="text-sm text-body">{place.display_name}</span>
+                <span className="text-sm text-body">{[place.name, place.admin1, place.country].filter(Boolean).join(', ')}</span>
               </button>
             ))}
           </div>

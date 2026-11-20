@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import React, { useMemo, useState, type FormEvent } from 'react';
 
 type Crop = 'Épices' | 'Tomates' | 'Riz' | 'Autre';
 type Status = 'normal' | 'attention' | 'alerte' | 'inconnu';
@@ -63,7 +63,7 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [form, setForm] = useState<TankForm>(emptyForm);
 
-  useEffect(() => {
+  React.useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tanks));
   }, [tanks]);
 

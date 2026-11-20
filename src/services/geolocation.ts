@@ -72,7 +72,7 @@ export async function getCurrentPosition(): Promise<LocationData> {
         }
         reject(new Error(message));
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
     );
   });
 }
@@ -82,9 +82,17 @@ async function reverseGeocode(lat: number, lon: number): Promise<{
   region: string;
   country: string;
 }> {
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=fr`
-  );
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=fr`,
+      { signal: controller.signal, headers: { Accept: 'application/json' } }
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
   
   if (!response.ok) throw new Error('Reverse geocoding failed');
 
@@ -113,15 +121,28 @@ async function reverseGeocode(lat: number, lon: number): Promise<{
 }
 
 export async function getWeatherData(lat: number, lon: number): Promise<WeatherData> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    throw new Error('Coordonnées géographiques invalides.');
+  }
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code&timezone=auto&forecast_days=7`;
 
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Weather API failed');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!response.ok) throw new Error(response.status === 429 ? 'Le service météo est temporairement saturé.' : 'Le service météo a refusé la requête.');
 
     const data = await response.json();
-    const current = data.current;
-    const daily = data.daily;
+    const current = data?.current;
+    const daily = data?.daily;
+    if (!current || !daily || !Array.isArray(daily.time) || !Array.isArray(daily.weather_code)) {
+      throw new Error('Les données météo reçues sont incomplètes.');
+    }
 
     const weatherCode = current.weather_code;
     const { condition, description, icon } = mapWeatherCode(weatherCode);
@@ -160,7 +181,7 @@ export async function getWeatherData(lat: number, lon: number): Promise<WeatherD
     };
   } catch (error) {
     console.error('Weather API error:', error);
-    throw new Error('Impossible de récupérer les données météo');
+    throw new Error(error instanceof Error && error.message.includes('trop') ? error.message : 'Impossible de récupérer les données météo. Vérifiez la connexion et réessayez.');
   }
 }
 

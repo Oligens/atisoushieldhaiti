@@ -54,13 +54,13 @@ export default function AIAssistant({ isDesktop }: AIAssistantProps) {
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-hide">
             {messages.length === 0 && <div className="h-full flex items-center justify-center text-center"><div><div className="text-5xl mb-4">🌱</div><h2 className="text-lg font-bold text-body">Atisou est prêt</h2><p className="text-sm text-body-secondary mt-2">Posez une question agricole pour démarrer.</p></div></div>}
             {messages.map(msg => <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}><div className={`max-w-[80%] rounded-2xl px-5 py-4 ${msg.type === 'user' ? 'cyber-button rounded-br-md' : 'glass-panel rounded-bl-md'}`}><p className="text-sm whitespace-pre-line leading-relaxed text-body">{msg.text}</p><p className="text-[10px] mt-2 text-body-secondary">{msg.timestamp}</p></div></div>)}
-            {isTyping && <div className="glass-panel rounded-2xl rounded-bl-md px-5 py-4 w-fit"><span className="text-xs text-body-secondary">Atisou analyse la question…</span></div>}
-            {error && <div className="glass-panel neon-border-amber rounded-xl p-3 text-xs text-gold">{error}</div>}
+            {isTyping && <div className="glass-panel rounded-2xl rounded-bl-md px-5 py-4 w-fit"><span className="text-xs text-body-secondary"><i className="fa-solid fa-spinner fa-spin mr-2 text-[#D4AF37]"></i>Atisou prépare sa réponse…</span></div>}
+            {error && <div className="glass-panel neon-border-amber rounded-xl p-3 text-xs text-gold" role="alert">{error}</div>}
             <div ref={messagesEndRef} />
           </div>
           <div className="px-6 py-4 border-t border-cyber-border">
             <div className="flex items-center gap-3">
-              <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Ex. Comment réduire le risque de maladie sur mes tomates ?" className="cyber-input flex-1 rounded-full px-5 py-3.5 text-sm" />
+              <input type="text" value={input} disabled={isTyping} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Ex. Comment réduire le risque de maladie sur mes tomates ?" className="cyber-input flex-1 rounded-full px-5 py-3.5 text-sm" />
               <button onClick={() => handleSend()} disabled={!input.trim() || isTyping} className="w-11 h-11 rounded-full cyber-button flex items-center justify-center disabled:opacity-40"><i className="fa-solid fa-paper-plane"></i></button>
             </div>
           </div>

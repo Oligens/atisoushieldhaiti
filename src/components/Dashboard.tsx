@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Screen } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { getCurrentPosition, getWeatherData, LocationData, WeatherData } from '../services/geolocation';

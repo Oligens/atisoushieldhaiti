@@ -64,7 +64,11 @@ export default function HydroponieIoT({ isDesktop }: { isDesktop: boolean }) {
   const [form, setForm] = useState<TankForm>(emptyForm);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tanks));
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tanks));
+    } catch (error) {
+      console.warn('Hydroponie: stockage local indisponible; les bacs ne seront pas conservés après fermeture.', error);
+    }
   }, [tanks]);
 
   const selected = useMemo(

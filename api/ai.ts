@@ -1,7 +1,9 @@
-type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
+type InteractionInput =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mime_type: string; data: string };
 
 function json(res: any, status: number, body: unknown) {
-  res.status(status).setHeader('Content-Type', 'application/json').json(body);
+  return res.status(status).setHeader('Content-Type', 'application/json').json(body);
 }
 
 export default async function handler(req: any, res: any) {
@@ -17,6 +19,7 @@ export default async function handler(req: any, res: any) {
   } catch {
     return json(res, 400, { error: 'Corps JSON invalide.' });
   }
+
   const mode = body?.mode === 'vision' ? 'vision' : 'chat';
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
   const imageData = typeof body?.imageData === 'string' ? body.imageData : '';
@@ -26,40 +29,60 @@ export default async function handler(req: any, res: any) {
   if (mode === 'vision' && !imageData) return json(res, 400, { error: 'Image requise pour le diagnostic.' });
   if (imageData.length > 8_000_000) return json(res, 413, { error: 'Image trop volumineuse. Réduisez la taille à moins de 6 Mo.' });
 
-  const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
-  const parts: GeminiPart[] = [{ text: prompt }];
+  const model = 'gemini-3.8-flash';
+  const input: InteractionInput[] = [{ type: 'text', text: prompt }];
   if (mode === 'vision') {
-    parts.push({ inline_data: { mime_type: mimeType, data: imageData.replace(/^data:[^;]+;base64,/, '') } });
+    input.push({
+      type: 'image',
+      mime_type: mimeType,
+      data: imageData.replace(/^data:[^;]+;base64,/, ''),
+    });
   }
-
-  const generationConfig: { temperature: number; responseMimeType?: string } = { temperature: 0.2 };
-  if (mode === 'vision') generationConfig.responseMimeType = 'application/json';
 
   let response: Response;
   try {
-    response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
+    response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts }],
-        generationConfig,
-      }),
-    },
-  );
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+        'Api-Revision': '2026-05-20',
+      },
+      body: JSON.stringify({ model, input }),
+    });
   } catch {
-    return json(res, 502, { error: 'Erreur réseau avec le fournisseur IA.' });
+    return json(res, 502, { error: 'Impossible de joindre le service Gemini. Vérifiez la connexion du serveur.' });
   }
 
-  const payload = await response.json();
+  let payload: any;
+  try {
+    payload = await response.json();
+  } catch {
+    return json(res, 502, { error: 'Gemini a renvoyé une réponse illisible.' });
+  }
+
   if (!response.ok) {
-    const message = payload?.error?.message || 'Le fournisseur IA a refusé la requête.';
-    return json(res, response.status >= 500 ? 502 : response.status, { error: message });
+    const message = payload?.error?.message || payload?.message || 'Gemini a refusé la requête.';
+    console.error('Gemini Interactions API error:', response.status, message);
+    return json(res, response.status >= 500 ? 502 : response.status, {
+      error: `Erreur Gemini (${response.status}) : ${message}`,
+      model,
+    });
   }
 
-  const text = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
-  if (!text) return json(res, 502, { error: 'Réponse IA vide.' });
+  const text = Array.isArray(payload?.steps)
+    ? payload.steps
+        .filter((step: any) => step?.type === 'model_output')
+        .flatMap((step: any) => Array.isArray(step.content) ? step.content : [])
+        .filter((part: any) => part?.type === 'text' && typeof part.text === 'string')
+        .map((part: any) => part.text)
+        .join('\n')
+    : '';
 
-  return json(res, 200, { text, model, provider: 'gemini' });
+  if (!text.trim()) {
+    console.error('Gemini Interactions API returned no model text:', payload?.status || 'unknown status');
+    return json(res, 502, { error: 'Gemini n’a retourné aucun texte. Réessayez avec une question plus précise.', model });
+  }
+
+  return json(res, 200, { text: text.trim(), model, provider: 'gemini' });
 }

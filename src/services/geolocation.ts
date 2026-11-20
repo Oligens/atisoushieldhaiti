@@ -43,8 +43,12 @@ async function getIpPosition(): Promise<LocationData> {
   const data = await response.json() as IpLocationResponse;
   if (!validCoordinates(data.latitude, data.longitude)) throw new Error('Coordonnées réseau invalides.');
   const location: LocationData = { latitude: data.latitude, longitude: data.longitude, accuracy: data.accuracy || 25000, region: data.city || data.region, country: data.country, countryCode: data.country, flagEmoji: flagFromCountryCode(data.country), timestamp: Date.now(), source: 'ip' };
-  try { Object.assign(location, await reverseGeocode(location.latitude, location.longitude)); }
-  catch (error) { console.warn('Géocodage de la position réseau indisponible :', error); location.address = [location.region, location.country].filter(Boolean).join(', '); }
+  try {
+    const details = await reverseGeocode(location.latitude, location.longitude);
+    Object.assign(location, Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined && value !== '')));
+    location.countryCode = location.countryCode || data.country;
+    location.flagEmoji = location.flagEmoji || flagFromCountryCode(data.country);
+  } catch (error) { console.warn('Géocodage de la position réseau indisponible :', error); location.address = [location.region, location.country].filter(Boolean).join(', '); }
   return location;
 }
 /** GPS navigateur d'abord, puis localisation réseau Vercel si le GPS échoue. */

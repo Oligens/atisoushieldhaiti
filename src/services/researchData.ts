@@ -70,12 +70,12 @@ export async function loadRiskMap() {
 export async function exportResearchData(format: 'csv' | 'json') {
   const rows = await researchRequest<AgriculturalCase[]>('/api/research?path=export');
   if (format === 'json') return JSON.stringify(rows, null, 2);
-  const keys = ['id','created_at','crop','location','latitude','longitude','predicted_disease','confidence','validation_label','actual_disease','field_outcome','weather'];
+  const keys: (keyof AgriculturalCase)[] = ['id','created_at','crop','location','latitude','longitude','predicted_disease','confidence','validation_label','actual_disease','field_outcome','weather'];
   const esc = (v: unknown) => {
     const s = typeof v === 'string' ? v : JSON.stringify(v ?? '');
-    return '"' + s.replaceAll('"','""') + '"';
+    return '"' + s.replace(/"/g, '""') + '"';
   };
-  return [keys.join(','), ...rows.map(row => keys.map(k => esc((row as Record<string, unknown>)[k])).join(','))].join('\n');
+  return [keys.join(','), ...rows.map(row => keys.map(k => esc(row[k])).join(','))].join('\n');
 }
 
 export function downloadResearchFile(content: string, filename: string, mime: string) {

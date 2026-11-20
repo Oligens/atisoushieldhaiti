@@ -31,7 +31,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
     }
   };
 
-  const quickActions = [  const quickActions = [
+  const quickActions = [
     { id: 'scanner', icon: '📸', label: 'Scanner une plante', description: 'Diagnostic instantané', screen: 'scanner' as Screen, glow: 'neon-border-green' },
     { id: 'assistant', icon: '💬', label: 'Discuter avec l\'IA', description: 'Posez vos questions', screen: 'assistant' as Screen, glow: 'neon-border-cyan' },
     { id: 'location', icon: '🗺️', label: 'Analyser un lieu', description: 'Conditions & prévisions', screen: 'location' as Screen, glow: 'neon-border-cyan' },

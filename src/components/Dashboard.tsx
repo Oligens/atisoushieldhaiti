@@ -167,7 +167,6 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
             </div>
           </div>
         )}
-      </div>
       {showAbout && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="about-software-title" onClick={(event) => { if (event.target === event.currentTarget) setShowAbout(false); }}>
           <div className="glass-panel neon-border-cyan rounded-2xl p-6 w-full max-w-xl animate-fade-in">
@@ -177,7 +176,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
           </div>
         </div>
       )}
-
+      </div>
     );
   }
 

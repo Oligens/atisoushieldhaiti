@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Screen } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { getCurrentPosition, getWeatherData, LocationData, WeatherData } from '../services/geolocation';
+import LocationOverview from './LocationOverview';
 
 interface DashboardProps {
   onNavigate: (screen: Screen) => void;
@@ -30,6 +31,10 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void loadDashboardData();
+  }, []);
 
   const quickActions = [
     { id: 'scanner', icon: '📸', label: 'Scanner une plante', description: 'Diagnostic instantané', screen: 'scanner' as Screen, glow: 'neon-border-green' },
@@ -69,7 +74,7 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
 
         {(loading || error) && (
         <div className="glass-panel rounded-xl p-4 mb-5 text-sm" role="status">
-          {loading ? <span className="text-body-secondary"><i className="fa-solid fa-spinner fa-spin mr-2 text-[#D4AF37]"></i>Recherche de votre position et de la météo…</span> : <span className="text-body-secondary"><i className="fa-solid fa-circle-info mr-2 text-[#D4AF37]"></i>{error} Vous pouvez utiliser les autres modules sans activer la géolocalisation.</span>}
+          {loading ? <span className="text-body-secondary"><i className="fa-solid fa-spinner fa-spin mr-2 text-[#D4AF37]"></i>Recherche de votre position et de la météo…</span> : <span className="text-body-secondary"><i className="fa-solid fa-circle-info mr-2 text-[#D4AF37]"></i>{error} La localisation approximative peut être utilisée si le GPS est indisponible.</span>}
         </div>
       )}
       {weather && location && (
@@ -104,6 +109,8 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
             </div>
           </div>
         )}
+
+        {weather && location && <LocationOverview location={location} weather={weather} />}
 
         <h2 className="text-lg font-bold text-body mb-4 flex items-center gap-2">
           <i className="fa-solid fa-bolt icon-gold"></i><span className="gradient-text">MODULES D'ACTION</span>
@@ -195,6 +202,9 @@ export default function Dashboard({ onNavigate, isDesktop }: DashboardProps) {
           </div>
         </div>
       )}
+
+      {(loading || error) && <div className="glass-panel rounded-xl p-3 mb-4 text-xs text-body-secondary" role="status">{loading ? 'Détection de votre position et récupération de la météo…' : error}</div>}
+      {weather && location && <LocationOverview location={location} weather={weather} />}
 
       <h2 className="text-base font-bold text-body mb-3 flex items-center gap-2">
         <i className="fa-solid fa-bolt icon-gold"></i><span className="gradient-text">MODULES</span>

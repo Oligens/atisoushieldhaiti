@@ -58,15 +58,27 @@ confidence doit être un entier de 0 à 100. Pour une image ambiguë, utilise un
 }
 
 export async function askAgriculturalAI(prompt: string): Promise<string> {
-  const response = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      mode: 'chat',
-      prompt: `Tu es Atisou, assistant agricole pour Haïti. Réponds en français, de façon claire et prudente. Distingue faits, hypothèses et incertitudes. Privilégie la lutte intégrée et les options biologiques. N'invente ni diagnostic certain, ni dose de pesticide, ni réglementation. Question: ${prompt}`,
-    }),
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload?.error || 'Assistant IA indisponible.');
-  return String(payload.text || 'Je n’ai pas pu produire une réponse.');
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 40000);
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        mode: 'chat',
+        prompt: `Tu es Atisou, assistant agricole pour Haïti. Réponds en français, de façon claire et structurée. Donne des mesures concrètes adaptées aux petites exploitations haïtiennes. Distingue faits, hypothèses et incertitudes. Privilégie la lutte intégrée, la prévention, l'hygiène culturale et les options biologiques. N'invente ni diagnostic certain, ni dose de pesticide, ni réglementation. Question: ${prompt}`,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || `Le service IA a répondu avec le code ${response.status}.`);
+    const answer = typeof payload?.text === 'string' ? payload.text.trim() : '';
+    if (!answer) throw new Error('Atisou n’a reçu aucune réponse exploitable. Réessayez.');
+    return answer;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('Atisou met trop de temps à répondre. Réessayez dans quelques instants.');
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }

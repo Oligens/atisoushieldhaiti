@@ -15,8 +15,6 @@ interface PlaceResult {
   country_code?: string;
 }
  
-export default function LocationAnalysis}
-
 export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);

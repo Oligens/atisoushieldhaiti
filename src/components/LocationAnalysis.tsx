@@ -175,10 +175,14 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   };
 
   const loadCurrentPosition = async () => {
+    // Chaque tentative GPS reçoit un identifiant. Une recherche ou une sélection
+    // manuelle plus récente l'invalide afin que le GPS ne puisse jamais l'écraser.
+    const gpsRequestId = ++requestSequence.current;
     setLoadingGps(true);
     setError(null);
     try {
       const position = await getCurrentPosition();
+      if (gpsRequestId !== requestSequence.current) return;
       await loadWeatherForPlace(
         position.latitude,
         position.longitude,
@@ -188,6 +192,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
         position,
       );
     } catch (err) {
+      if (gpsRequestId !== requestSequence.current) return;
       setError(err instanceof Error ? err.message : 'Position actuelle indisponible. Recherchez un lieu manuellement.');
     } finally {
       setLoadingGps(false);
@@ -207,6 +212,9 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
       setSearchError('Saisissez au moins deux caractères pour rechercher un lieu.');
       return;
     }
+    // Une nouvelle recherche invalide immédiatement toute réponse GPS/météo
+    // antérieure encore en attente. Le lieu choisi ensuite sera prioritaire.
+    ++requestSequence.current;
     setSearching(true);
     setSearchError(null);
     setPlaces([]);

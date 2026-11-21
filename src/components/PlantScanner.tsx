@@ -31,7 +31,7 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
         const diagnosis = await analyzePlantImage({ imageData, mimeType: file.type, crop, location });
         setResult(diagnosis);
         try {
-          const match = location.match(/(-?\\d+(?:\\.\\d+)?)[,; ]+(-?\\d+(?:\\.\\d+)?)/);
+          const match = location.match(/(-?\d+(?:\.\d+)?)[,; ]+(-?\d+(?:\.\d+)?)/);
           const saved = await saveAgriculturalCase({
             crop: crop || 'Non renseigné',
             location: location || 'Non renseigné',

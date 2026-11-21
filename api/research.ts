@@ -165,8 +165,8 @@ export default async function handler(req: any, res: any) {
     }
 
     if (req.method === 'GET' && path === 'risk-map') {
-      const [caseRows, observationRows] = await Promise.all([
-        sql`SELECT location, latitude, longitude, confidence, validation_label
+      const [caseRows, observationRows, verifiedRows] = await Promise.all([
+        sql`SELECT location, latitude, longitude, confidence
             FROM agricultural_cases
             WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
@@ -174,6 +174,12 @@ export default async function handler(req: any, res: any) {
             FROM weather_observations
             WHERE user_id = ${actor}
             ORDER BY observed_at DESC`,
+        sql`SELECT c.location
+            FROM agricultural_field_surveys s
+            JOIN agricultural_cases c ON c.id = s.linked_case_id
+            WHERE s.user_id = ${actor}
+              AND s.verification_status = 'verified'
+              AND s.assessment = 'confirmed'`,
       ]);
       const grouped = new Map<string, any>();
       for (const row of caseRows as any[]) {
@@ -183,11 +189,15 @@ export default async function handler(req: any, res: any) {
           avgConfidence: 0, latitude: row.latitude ?? null, longitude: row.longitude ?? null,
         };
         point.cases += 1;
-        point.confirmed += row.validation_label === 'confirmed' ? 1 : 0;
         point.avgConfidence += Number(row.confidence || 0);
         if (row.latitude != null) point.latitude = row.latitude;
         if (row.longitude != null) point.longitude = row.longitude;
         grouped.set(key, point);
+      }
+      for (const row of verifiedRows as any[]) {
+        const key = row.location || 'Lieu non renseigné';
+        const point = grouped.get(key);
+        if (point) point.confirmed += 1;
       }
       for (const row of observationRows as any[]) {
         if (row.latitude == null || row.longitude == null) continue;
@@ -273,14 +283,7 @@ export default async function handler(req: any, res: any) {
          ${body.treatment_applied || null},${body.treatment_date || null},${body.follow_up_date || null},
          ${body.follow_up_result || null},${body.expert_notes || null},'pending')
         RETURNING *`;
-      if (body.linked_case_id) {
-        await sql`UPDATE agricultural_cases
-          SET validation_label=CASE WHEN ${body.assessment}='observation_only' THEN validation_label ELSE ${body.assessment} END,
-              actual_disease=COALESCE(${body.field_diagnosis?.trim() || null},actual_disease),
-              field_outcome=COALESCE(${body.follow_up_result || body.treatment_applied || null},field_outcome),
-              updated_at=now()
-          WHERE id=${body.linked_case_id} AND user_id=${actor}`;
-      }
+      // Le dossier lié reste non validé tant que l'enquête n'a pas été vérifiée.
       return json(res, 201, r[0]);
     }
 

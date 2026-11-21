@@ -61,6 +61,8 @@ export interface FieldSurvey {
   follow_up_date?: string | null;
   follow_up_result?: string | null;
   expert_notes?: string | null;
+  verification_status: 'pending' | 'verified' | 'rejected';
+  verified_at?: string | null;
   created_at: string;
 }
 

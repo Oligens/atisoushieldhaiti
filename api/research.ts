@@ -248,6 +248,11 @@ export default async function handler(req: any, res: any) {
       if (['confirmed', 'rejected'].includes(body.assessment) && !String(body.field_diagnosis ?? '').trim()) {
         return json(res, 400, { error: 'Le diagnostic de référence est obligatoire pour confirmer ou rejeter un diagnostic IA.' });
       }
+      if (body.linked_case_id) {
+        const linked = await sql`SELECT id FROM agricultural_cases
+          WHERE id=${body.linked_case_id} AND (user_id=${actor} OR ${actor}='anonymous') LIMIT 1`;
+        if (!linked.length) return json(res, 404, { error: 'Le cas IA à valider est introuvable ou inaccessible.' });
+      }
       const r = await sql`INSERT INTO agricultural_field_surveys
         (user_id,linked_case_id,crop,symptoms,field_diagnosis,assessment,observer_name,observer_role,observer_organization,
          visit_date,location,latitude,longitude,treatment_applied,treatment_date,follow_up_date,follow_up_result,expert_notes)
@@ -259,9 +264,9 @@ export default async function handler(req: any, res: any) {
         RETURNING *`;
       if (body.linked_case_id) {
         await sql`UPDATE agricultural_cases
-          SET validation_label=${body.assessment === 'observation_only' ? null : body.assessment},
-              actual_disease=${body.field_diagnosis?.trim() || null},
-              field_outcome=${body.follow_up_result || body.treatment_applied || null},
+          SET validation_label=CASE WHEN ${body.assessment}='observation_only' THEN validation_label ELSE ${body.assessment} END,
+              actual_disease=COALESCE(${body.field_diagnosis?.trim() || null},actual_disease),
+              field_outcome=COALESCE(${body.follow_up_result || body.treatment_applied || null},field_outcome),
               updated_at=now()
           WHERE id=${body.linked_case_id} AND (user_id=${actor} OR ${actor}='anonymous')`;
       }

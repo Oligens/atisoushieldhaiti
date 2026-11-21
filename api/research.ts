@@ -8,13 +8,9 @@ function json(res: any, status: number, body: unknown) {
   res.status(status).setHeader('Content-Type', 'application/json').json(body);
 }
 
-function userId(req: any) {
+function userId(req: any): string | null {
   const value = req.headers?.['x-atisou-user-id'];
-  return typeof value === 'string' && value.trim() ? value.trim() : 'anonymous';
-}
-
-function isVisibleToActor(row: any, actor: string) {
-  return actor === 'anonymous' || String(row.user_id) === actor;
+  return typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value.trim()) ? value.trim() : null;
 }
 
 function buildMetrics(rows: any[]) {
@@ -70,15 +66,20 @@ export default async function handler(req: any, res: any) {
   if (!sql) return json(res, 500, { error: 'DATABASE_URL/NEON_DATABASE_URL absent dans Vercel.' });
   const path = typeof req.query?.path === 'string' ? req.query.path : '';
   const actor = userId(req);
+  if (!actor) return json(res, 401, { error: 'Session utilisateur absente. Reconnectez-vous avant d’accéder au corpus.' });
   try {
     if (req.method === 'GET' && path === 'stats') {
-      const [caseRows, observationRows] = await Promise.all([
+      const [caseRows, observationRows, surveyRows, eventRows] = await Promise.all([
         sql`SELECT crop, location, predicted_disease, confidence, validation_label, actual_disease
             FROM agricultural_cases
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
         sql`SELECT user_id FROM weather_observations
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'`,
+            WHERE user_id = ${actor}`,
+        sql`SELECT id FROM agricultural_field_surveys
+            WHERE user_id = ${actor}`,
+        sql`SELECT id, event_type FROM agricultural_research_events
+            WHERE user_id = ${actor}`,
       ]);
       const rows = caseRows as any[];
       const metrics = buildMetrics(rows);
@@ -101,6 +102,9 @@ export default async function handler(req: any, res: any) {
           ? Math.round(rows.reduce((sum, row) => sum + Number(row.confidence || 0), 0) / rows.length)
           : 0,
         weatherObservations: observationRows.length,
+        fieldSurveys: surveyRows.length,
+        aiConsultations: (eventRows as any[]).filter((row: any) => row.event_type === 'ai_consultation').length,
+        researchEvents: eventRows.length,
         byCrop: count('crop'),
         byDisease: count('predicted_disease'),
         byLocation: count('location'),
@@ -115,10 +119,33 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    if (req.method === 'GET' && path === 'cases') {
+      const rows = await sql`SELECT id, created_at, crop, location, latitude, longitude, predicted_disease, confidence, validation_label, actual_disease
+        FROM agricultural_cases
+        WHERE user_id = ${actor}
+        ORDER BY created_at DESC LIMIT 250`;
+      return json(res, 200, rows);
+    }
+
+    if (req.method === 'GET' && path === 'field-surveys') {
+      const rows = await sql`SELECT * FROM agricultural_field_surveys
+        WHERE user_id = ${actor}
+        ORDER BY visit_date DESC LIMIT 250`;
+      return json(res, 200, rows);
+    }
+
+    if (req.method === 'GET' && path === 'events') {
+      const rows = await sql`SELECT id, source, event_type, prompt, ai_response, crop, location, latitude, longitude, weather, metadata, created_at
+        FROM agricultural_research_events
+        WHERE user_id = ${actor}
+        ORDER BY created_at DESC LIMIT 250`;
+      return json(res, 200, rows);
+    }
+
     if (req.method === 'GET' && path === 'observations') {
       const rows = await sql`SELECT id, observed_at, latitude, longitude, temperature, humidity, wind_speed, rainfall, weather
         FROM weather_observations
-        WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+        WHERE user_id = ${actor}
         ORDER BY observed_at DESC LIMIT 50`;
       return json(res, 200, rows);
     }
@@ -127,11 +154,11 @@ export default async function handler(req: any, res: any) {
       const [caseRows, observationRows] = await Promise.all([
         sql`SELECT location, latitude, longitude, confidence, validation_label
             FROM agricultural_cases
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
-        sql`SELECT latitude, longitude, observed_at
+        sql`SELECT latitude, longitude, observed_at, weather
             FROM weather_observations
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY observed_at DESC`,
       ]);
       const grouped = new Map<string, any>();
@@ -153,7 +180,9 @@ export default async function handler(req: any, res: any) {
         const latitude = Number(row.latitude);
         const longitude = Number(row.longitude);
         // Regroupement spatial à environ 1 km, sans prétendre représenter une commune.
-        const key = 'Observation météo · ' + latitude.toFixed(2) + ', ' + longitude.toFixed(2);
+        const metadata = row.weather && typeof row.weather === 'object' ? row.weather : {};
+        const placeLabel = [metadata.commune, metadata.department, metadata.country].filter(Boolean).join(', ');
+        const key = placeLabel || ('Observation météo · ' + latitude.toFixed(2) + ', ' + longitude.toFixed(2));
         const point = grouped.get(key) || {
           location: key, cases: 0, observations: 0, confirmed: 0,
           avgConfidence: 0, latitude, longitude,
@@ -168,23 +197,79 @@ export default async function handler(req: any, res: any) {
     }
 
     if (req.method === 'GET' && path === 'export') {
-      const [cases, weatherObservations] = await Promise.all([
+      const [cases, weatherObservations, fieldSurveys, researchEvents] = await Promise.all([
         sql`SELECT * FROM agricultural_cases
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
         sql`SELECT * FROM weather_observations
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY observed_at DESC`,
+        sql`SELECT * FROM agricultural_field_surveys
+            WHERE user_id = ${actor}
+            ORDER BY visit_date DESC`,
+        sql`SELECT * FROM agricultural_research_events
+            WHERE user_id = ${actor}
+            ORDER BY created_at DESC`,
       ]);
       return json(res, 200, {
         generated_at: new Date().toISOString(),
         cases,
         weather_observations: weatherObservations,
-        totals: { cases: cases.length, weather_observations: weatherObservations.length },
+        field_surveys: fieldSurveys,
+        research_events: researchEvents,
+        totals: { cases: cases.length, weather_observations: weatherObservations.length, field_surveys: fieldSurveys.length, research_events: researchEvents.length },
       });
     }
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+    if (req.method === 'POST' && path === 'events') {
+      if (!['ai_assistant', 'location_analysis', 'plant_scan'].includes(body.source) || !body.event_type) {
+        return json(res, 400, { error: 'Source et type d’événement requis.' });
+      }
+      const r = await sql`INSERT INTO agricultural_research_events
+        (user_id,source,event_type,prompt,ai_response,crop,location,latitude,longitude,weather,metadata)
+        VALUES (${actor},${body.source},${body.event_type},${body.prompt ?? null},${body.ai_response ?? null},
+          ${body.crop ?? null},${body.location ?? null},${body.latitude ?? null},${body.longitude ?? null},
+          ${body.weather ?? null},${body.metadata ?? {}})
+        RETURNING *`;
+      return json(res, 201, r[0]);
+    }
+
+    if (req.method === 'POST' && path === 'field-surveys') {
+      const required = ['crop', 'observer_name', 'observer_role', 'visit_date', 'location', 'assessment'];
+      const missing = required.filter((key) => !String(body[key] ?? '').trim());
+      if (missing.length) return json(res, 400, { error: 'Champs obligatoires manquants : ' + missing.join(', ') });
+      if (!['confirmed', 'rejected', 'uncertain', 'observation_only'].includes(body.assessment)) {
+        return json(res, 400, { error: 'Statut de validation terrain invalide.' });
+      }
+      if (['confirmed', 'rejected'].includes(body.assessment) && !String(body.field_diagnosis ?? '').trim()) {
+        return json(res, 400, { error: 'Le diagnostic de référence est obligatoire pour confirmer ou rejeter un diagnostic IA.' });
+      }
+      if (body.linked_case_id) {
+        const linked = await sql`SELECT id FROM agricultural_cases
+          WHERE id=${body.linked_case_id} AND user_id=${actor} LIMIT 1`;
+        if (!linked.length) return json(res, 404, { error: 'Le cas IA à valider est introuvable ou inaccessible.' });
+      }
+      const r = await sql`INSERT INTO agricultural_field_surveys
+        (user_id,linked_case_id,crop,symptoms,field_diagnosis,assessment,observer_name,observer_role,observer_organization,
+         visit_date,location,latitude,longitude,treatment_applied,treatment_date,follow_up_date,follow_up_result,expert_notes)
+        VALUES (${actor},${body.linked_case_id || null},${body.crop},${Array.isArray(body.symptoms) ? body.symptoms : []},
+         ${body.field_diagnosis?.trim() || null},${body.assessment},${body.observer_name},${body.observer_role},
+         ${body.observer_organization || null},${body.visit_date},${body.location},${body.latitude ?? null},${body.longitude ?? null},
+         ${body.treatment_applied || null},${body.treatment_date || null},${body.follow_up_date || null},
+         ${body.follow_up_result || null},${body.expert_notes || null})
+        RETURNING *`;
+      if (body.linked_case_id) {
+        await sql`UPDATE agricultural_cases
+          SET validation_label=CASE WHEN ${body.assessment}='observation_only' THEN validation_label ELSE ${body.assessment} END,
+              actual_disease=COALESCE(${body.field_diagnosis?.trim() || null},actual_disease),
+              field_outcome=COALESCE(${body.follow_up_result || body.treatment_applied || null},field_outcome),
+              updated_at=now()
+          WHERE id=${body.linked_case_id} AND user_id=${actor}`;
+      }
+      return json(res, 201, r[0]);
+    }
+
     if (req.method === 'POST' && path === 'cases') {
       if (!body.predicted_disease) return json(res, 400, { error: 'Le diagnostic prédit est obligatoire.' });
       const r = await sql`INSERT INTO agricultural_cases
@@ -200,14 +285,14 @@ export default async function handler(req: any, res: any) {
       const r = await sql`UPDATE agricultural_cases
         SET validation_label=${body.validation_label ?? null}, actual_disease=${body.actual_disease?.trim() || null},
             field_outcome=${body.field_outcome ?? null}, weather=COALESCE(${body.weather ?? null},weather)
-        WHERE id=${body.id} AND (user_id=${actor} OR ${actor}='anonymous') RETURNING *`;
+        WHERE id=${body.id} AND user_id=${actor} RETURNING *`;
       if (!r.length) return json(res, 404, { error: 'Cas introuvable.' });
       return json(res, 200, r[0]);
     }
     if (req.method === 'PATCH' && path === 'cases-weather') {
       if (!body.id) return json(res, 400, { error: 'Identifiant de cas requis.' });
       const r = await sql`UPDATE agricultural_cases SET weather=${body.weather ?? null}
-        WHERE id=${body.id} AND (user_id=${actor} OR ${actor}='anonymous') RETURNING *`;
+        WHERE id=${body.id} AND user_id=${actor} RETURNING *`;
       if (!r.length) return json(res, 404, { error: 'Cas introuvable.' });
       return json(res, 200, r[0]);
     }

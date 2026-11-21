@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   downloadResearchFile,
   exportResearchData,
@@ -7,7 +7,9 @@ import {
   loadRiskMap,
   loadAgriculturalCases,
   loadFieldSurveys,
+  loadResearchEvents,
   saveFieldSurvey,
+  type ResearchEvent,
   type AgriculturalCase,
   type FieldSurvey,
   type ResearchStats,
@@ -23,6 +25,7 @@ export default function ResearchMode({ isDesktop }: Props) {
   const [observations, setObservations] = useState<WeatherObservation[]>([]);
   const [cases, setCases] = useState<AgriculturalCase[]>([]);
   const [fieldSurveys, setFieldSurveys] = useState<FieldSurvey[]>([]);
+  const [researchEvents, setResearchEvents] = useState<ResearchEvent[]>([]);
   const [savingSurvey, setSavingSurvey] = useState(false);
   const [surveyMessage, setSurveyMessage] = useState('');
   const [fieldForm, setFieldForm] = useState({
@@ -52,18 +55,20 @@ export default function ResearchMode({ isDesktop }: Props) {
     setLoading(true);
     setError('');
     try {
-      const [nextStats, nextMap, nextObservations, nextCases, nextSurveys] = await Promise.all([
+      const [nextStats, nextMap, nextObservations, nextCases, nextSurveys, nextEvents] = await Promise.all([
         loadResearchStats(),
         loadRiskMap(),
         loadRecentWeatherObservations(),
         loadAgriculturalCases(),
         loadFieldSurveys(),
+        loadResearchEvents(),
       ]);
       setStats(nextStats);
       setRiskMap(nextMap);
       setObservations(nextObservations);
       setCases(nextCases);
       setFieldSurveys(nextSurveys);
+      setResearchEvents(nextEvents);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Données de recherche indisponibles.');
     } finally {
@@ -90,7 +95,7 @@ export default function ResearchMode({ isDesktop }: Props) {
     }
   };
 
-  const submitFieldSurvey = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submitFieldSurvey = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSavingSurvey(true);
     setSurveyMessage('');
@@ -160,10 +165,12 @@ export default function ResearchMode({ isDesktop }: Props) {
     </div>}
 
     {loading ? <div className="glass-panel rounded-2xl p-8 text-center text-body-secondary">Chargement des données réelles depuis Neon...</div> : stats && <>
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4 mb-6">
         {[
           ['CAS AGRICOLES', stats.totalCases],
           ['OBSERVATIONS MÉTÉO', stats.weatherObservations],
+          ['CONSULTATIONS IA', stats.aiConsultations],
+          ['ENQUÊTES TERRAIN', stats.fieldSurveys],
           ['CONFIRMÉS', stats.confirmed],
           ['REJETÉS', stats.rejected],
           ['INCERTAINS', stats.uncertain],
@@ -275,6 +282,23 @@ export default function ResearchMode({ isDesktop }: Props) {
               <td className="py-2 text-body">{item.rainfall ?? 0} mm</td>
             </tr>)}</tbody>
           </table></div>}
+      </section>
+
+      <section className="glass-panel rounded-2xl p-6 mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div><h2 className="text-lg font-bold gradient-text">Flux de collecte des analyses</h2><p className="text-xs text-body-secondary mt-1">Historique des consultations IA, analyses météo et diagnostics du scanner.</p></div>
+          <span className="text-xs text-body-secondary">{researchEvents.length} événements archivés</span>
+        </div>
+        {researchEvents.length === 0 ? <p className="text-sm text-body-secondary">Aucune consultation ou analyse IA archivée. Les prochains échanges de l’assistant et les prochaines analyses de lieu apparaîtront ici.</p> : <div className="space-y-2">
+          {researchEvents.slice(0, 15).map(item => <article key={item.id} className="glass-panel rounded-xl p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-xs text-body">{item.source === 'ai_assistant' ? 'Consultation assistant IA' : item.source === 'location_analysis' ? 'Analyse météo et risque local' : 'Diagnostic scanner'}</strong><span className="text-[10px] text-body-secondary">{formatDate(item.created_at)}</span></div>
+            {item.prompt && <p className="text-xs text-body mt-2">Question : {item.prompt}</p>}
+            {item.ai_response && <p className="text-xs text-body-secondary mt-1 line-clamp-3">Réponse : {item.ai_response}</p>}
+            {item.location && <p className="text-xs text-body-secondary mt-1">Lieu : {item.location}</p>}
+            {item.metadata?.predictedDisease && <p className="text-xs text-body-secondary mt-1">Diagnostic IA : {String(item.metadata.predictedDisease)} ({String(item.metadata.confidence ?? '')}%)</p>}
+            {item.metadata?.agriculturalRisk && <p className="text-xs text-body-secondary mt-1">Risque météo : {String((item.metadata.agriculturalRisk as Record<string, unknown>).level ?? 'calculé')} · score {String((item.metadata.agriculturalRisk as Record<string, unknown>).score ?? '—')}</p>}
+          </article>)}
+        </div>}
       </section>
 
       <section className="glass-panel rounded-2xl p-6 mt-6">

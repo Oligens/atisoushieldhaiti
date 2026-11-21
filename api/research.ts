@@ -69,20 +69,32 @@ export default async function handler(req: any, res: any) {
   if (!actor) return json(res, 401, { error: 'Session utilisateur absente. Reconnectez-vous avant d’accéder au corpus.' });
   try {
     if (req.method === 'GET' && path === 'stats') {
-      const [caseRows, observationRows, surveyRows, eventRows] = await Promise.all([
-        sql`SELECT crop, location, predicted_disease, confidence, validation_label, actual_disease
+      const [caseRows, observationRows, surveyRows, eventRows, verifiedReferenceRows] = await Promise.all([
+        sql`SELECT crop, location, predicted_disease, confidence
             FROM agricultural_cases
             WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
-        sql`SELECT user_id FROM weather_observations
+        sql`SELECT id FROM weather_observations
             WHERE user_id = ${actor}`,
-        sql`SELECT id FROM agricultural_field_surveys
+        sql`SELECT id, assessment, verification_status FROM agricultural_field_surveys
             WHERE user_id = ${actor}`,
         sql`SELECT id, event_type FROM agricultural_research_events
             WHERE user_id = ${actor}`,
+        sql`SELECT s.assessment AS validation_label,
+                   s.field_diagnosis AS actual_disease,
+                   c.predicted_disease
+            FROM agricultural_field_surveys s
+            JOIN agricultural_cases c ON c.id = s.linked_case_id
+            WHERE s.user_id = ${actor}
+              AND s.verification_status = 'verified'
+              AND s.assessment IN ('confirmed', 'rejected')
+              AND NULLIF(BTRIM(s.field_diagnosis), '') IS NOT NULL
+            ORDER BY s.visit_date DESC`,
       ]);
       const rows = caseRows as any[];
-      const metrics = buildMetrics(rows);
+      // Les retours directs du scanner ne sont pas des références scientifiques.
+      // Seules les enquêtes terrain explicitement vérifiées alimentent les métriques.
+      const metrics = buildMetrics(verifiedReferenceRows as any[]);
       const count = (key: string) => {
         const values = new Map<string, number>();
         rows.forEach((row) => {
@@ -97,6 +109,8 @@ export default async function handler(req: any, res: any) {
         confirmed: metrics.confirmed,
         rejected: metrics.rejected,
         uncertain: metrics.uncertain,
+        pendingFieldSurveys: (surveyRows as any[]).filter((row) => row.verification_status === 'pending').length,
+        verifiedFieldSurveys: (surveyRows as any[]).filter((row) => row.verification_status === 'verified').length,
         confirmationRate: metrics.confirmationRate,
         averageConfidence: rows.length
           ? Math.round(rows.reduce((sum, row) => sum + Number(row.confidence || 0), 0) / rows.length)
@@ -252,12 +266,12 @@ export default async function handler(req: any, res: any) {
       }
       const r = await sql`INSERT INTO agricultural_field_surveys
         (user_id,linked_case_id,crop,symptoms,field_diagnosis,assessment,observer_name,observer_role,observer_organization,
-         visit_date,location,latitude,longitude,treatment_applied,treatment_date,follow_up_date,follow_up_result,expert_notes)
+         visit_date,location,latitude,longitude,treatment_applied,treatment_date,follow_up_date,follow_up_result,expert_notes,verification_status)
         VALUES (${actor},${body.linked_case_id || null},${body.crop},${Array.isArray(body.symptoms) ? body.symptoms : []},
          ${body.field_diagnosis?.trim() || null},${body.assessment},${body.observer_name},${body.observer_role},
          ${body.observer_organization || null},${body.visit_date},${body.location},${body.latitude ?? null},${body.longitude ?? null},
          ${body.treatment_applied || null},${body.treatment_date || null},${body.follow_up_date || null},
-         ${body.follow_up_result || null},${body.expert_notes || null})
+         ${body.follow_up_result || null},${body.expert_notes || null},'pending')
         RETURNING *`;
       if (body.linked_case_id) {
         await sql`UPDATE agricultural_cases

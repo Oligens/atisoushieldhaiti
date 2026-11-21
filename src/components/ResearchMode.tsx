@@ -103,7 +103,7 @@ export default function ResearchMode({ isDesktop }: Props) {
       await saveFieldSurvey({
         linked_case_id: fieldForm.linked_case_id || null,
         crop: fieldForm.crop.trim(),
-        symptoms: fieldForm.symptoms.split(/[;,\\n]/).map((value) => value.trim()).filter(Boolean),
+        symptoms: fieldForm.symptoms.split(/[;,\n]/).map((value) => value.trim()).filter(Boolean),
         field_diagnosis: fieldForm.field_diagnosis.trim() || null,
         assessment: fieldForm.assessment,
         observer_name: fieldForm.observer_name.trim(),

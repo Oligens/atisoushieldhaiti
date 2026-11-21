@@ -15,6 +15,28 @@ export interface AgriculturalCase {
   field_outcome?: string | null;
 }
 
+export interface WeatherObservation {
+  id: string;
+  observed_at: string;
+  latitude: number;
+  longitude: number;
+  temperature: number;
+  humidity: number;
+  wind_speed: number;
+  rainfall: number;
+  weather?: Record<string, unknown> | null;
+}
+
+export interface RiskMapPoint {
+  location: string;
+  cases: number;
+  observations: number;
+  confirmed: number;
+  avgConfidence: number;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 export interface ModelMetrics {
   accuracy: number;
   precision: number;
@@ -31,10 +53,18 @@ export interface ResearchStats {
   uncertain: number;
   confirmationRate: number;
   averageConfidence: number;
+  weatherObservations: number;
   byCrop: { label: string; value: number }[];
   byDisease: { label: string; value: number }[];
   byLocation: { label: string; value: number }[];
   metrics: ModelMetrics;
+}
+
+export interface ResearchExport {
+  generated_at: string;
+  cases: AgriculturalCase[];
+  weather_observations: WeatherObservation[];
+  totals: { cases: number; weather_observations: number };
 }
 
 export async function saveAgriculturalCase(input: Omit<AgriculturalCase, 'id' | 'created_at'>) {
@@ -64,18 +94,39 @@ export async function loadResearchStats() {
 }
 
 export async function loadRiskMap() {
-  return researchRequest<Array<{ location: string; cases: number; confirmed: number; avgConfidence: number; latitude: number | null; longitude: number | null }>>('/api/research?path=risk-map');
+  return researchRequest<RiskMapPoint[]>('/api/research?path=risk-map');
+}
+
+export async function loadRecentWeatherObservations() {
+  return researchRequest<WeatherObservation[]>('/api/research?path=observations');
 }
 
 export async function exportResearchData(format: 'csv' | 'json') {
-  const rows = await researchRequest<AgriculturalCase[]>('/api/research?path=export');
-  if (format === 'json') return JSON.stringify(rows, null, 2);
-  const keys: (keyof AgriculturalCase)[] = ['id','created_at','crop','location','latitude','longitude','predicted_disease','confidence','validation_label','actual_disease','field_outcome','weather'];
-  const esc = (v: unknown) => {
-    const s = typeof v === 'string' ? v : JSON.stringify(v ?? '');
-    return '"' + s.replace(/"/g, '""') + '"';
+  const data = await researchRequest<ResearchExport>('/api/research?path=export');
+  if (format === 'json') return JSON.stringify(data, null, 2);
+
+  const columns = [
+    'type_enregistrement', 'id', 'date', 'culture', 'lieu', 'latitude', 'longitude',
+    'diagnostic_predit', 'confiance', 'validation_terrain', 'diagnostic_terrain',
+    'resultat_terrain', 'temperature_c', 'humidite_pct', 'vent_kmh', 'pluie_mm', 'meteo_json',
+  ];
+  const esc = (value: unknown) => {
+    const stringValue = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+    return '"' + stringValue.replace(/"/g, '""') + '"';
   };
-  return [keys.join(','), ...rows.map(row => keys.map(k => esc(row[k])).join(','))].join('\n');
+  const caseRows = data.cases.map((row) => [
+    'cas_agricole', row.id, row.created_at, row.crop, row.location, row.latitude, row.longitude,
+    row.predicted_disease, row.confidence, row.validation_label, row.actual_disease, row.field_outcome,
+    '', '', '', '', row.weather,
+  ]);
+  const observationRows = data.weather_observations.map((row) => [
+    'observation_meteo', row.id, row.observed_at, '', 'Observation GPS', row.latitude, row.longitude,
+    '', '', '', '', '', row.temperature, row.humidity, row.wind_speed, row.rainfall, row.weather,
+  ]);
+  return [
+    columns.join(','),
+    ...[...caseRows, ...observationRows].map((row) => row.map(esc).join(',')),
+  ].join('\n');
 }
 
 export function downloadResearchFile(content: string, filename: string, mime: string) {

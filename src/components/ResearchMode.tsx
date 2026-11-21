@@ -171,6 +171,8 @@ export default function ResearchMode({ isDesktop }: Props) {
           ['OBSERVATIONS MÉTÉO', stats.weatherObservations],
           ['CONSULTATIONS IA', stats.aiConsultations],
           ['ENQUÊTES TERRAIN', stats.fieldSurveys],
+          ['EN ATTENTE DE VÉRIFICATION', stats.pendingFieldSurveys],
+          ['RÉFÉRENCES VÉRIFIÉES', stats.verifiedFieldSurveys],
           ['CONFIRMÉS', stats.confirmed],
           ['REJETÉS', stats.rejected],
           ['INCERTAINS', stats.uncertain],

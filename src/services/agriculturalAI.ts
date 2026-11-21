@@ -1,5 +1,6 @@
 export interface VisionDiagnosis {
   disease: string;
+  symptoms: string[];
   confidence: number;
   affectedArea: string;
   explanation: string;

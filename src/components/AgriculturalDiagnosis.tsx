@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AgriculturalDiagnosis, PlantDiseaseGuide } from '../services/agriculturalDiagnosis';
 
 interface AgriculturalDiagnosisProps {
@@ -54,6 +55,12 @@ function DiseaseCard({ disease }: { disease: PlantDiseaseGuide }) {
 }
 
 export default function AgriculturalDiagnosis({ mode, diagnosis, locationLabel, onClose, onDetails }: AgriculturalDiagnosisProps) {
+  const [selectedCrop, setSelectedCrop] = useState('Toutes les cultures');
+  const availableCrops = Array.from(new Set(diagnosis.diseases.flatMap((disease) => disease.crops))).sort();
+  const visibleDiseases = selectedCrop === 'Toutes les cultures'
+    ? diagnosis.diseases
+    : diagnosis.diseases.filter((disease) => disease.crops.includes(selectedCrop));
+
   if (mode === 'summary') {
     return (
       <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -120,8 +127,17 @@ export default function AgriculturalDiagnosis({ mode, diagnosis, locationLabel, 
         </section>
 
         <section className="mt-7">
-          <div className="mb-4"><h2 className="text-xl font-bold text-body">Maladies végétales à connaître</h2><p className="text-xs text-body-secondary mt-1">Les fiches prioritaires sont classées selon les conditions météo de la zone. Les autres sont des fiches de prévention à consulter uniquement si vous cultivez les espèces concernées.</p></div>
-          <div className="space-y-4">{diagnosis.diseases.map((disease) => <DiseaseCard key={disease.id} disease={disease} />)}</div>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-body">Maladies végétales à connaître</h2>
+            <p className="text-xs text-body-secondary mt-1">Les fiches prioritaires sont classées selon les conditions météo de la zone. Choisissez votre culture pour afficher les maladies qui la concernent.</p>
+            <label className="block text-xs font-semibold text-gold mt-4 mb-2" htmlFor="diagnosis-crop-filter">Culture présente dans votre parcelle</label>
+            <select id="diagnosis-crop-filter" value={selectedCrop} onChange={(event) => setSelectedCrop(event.target.value)} className="cyber-input w-full sm:max-w-sm rounded-xl px-4 py-3 text-sm">
+              <option value="Toutes les cultures">Toutes les cultures</option>
+              {availableCrops.map((crop) => <option key={crop} value={crop}>{crop}</option>)}
+            </select>
+          </div>
+          <div className="space-y-4">{visibleDiseases.map((disease) => <DiseaseCard key={disease.id} disease={disease} />)}</div>
+          {visibleDiseases.length === 0 && <p className="text-sm text-body-secondary">Aucune fiche disponible pour cette culture.</p>}
         </section>
 
         <section className="glass-panel rounded-2xl p-5 sm:p-6 mt-7">

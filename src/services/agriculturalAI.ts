@@ -3,6 +3,7 @@ export interface VisionDiagnosis {
   confidence: number;
   affectedArea: string;
   explanation: string;
+  symptoms: string[];
   treatments: string[];
   biopesticides: string[];
   precautions: string[];
@@ -49,6 +50,7 @@ confidence doit être un entier de 0 à 100. Pour une image ambiguë, utilise un
     confidence: Math.max(0, Math.min(100, Number(parsed.confidence) || 0)),
     affectedArea: parsed.affectedArea || 'Non déterminée',
     explanation: parsed.explanation || 'Aucune explication fournie.',
+    symptoms: Array.isArray(parsed.symptoms) ? parsed.symptoms.filter((item): item is string => typeof item === 'string') : [],
     treatments: Array.isArray(parsed.treatments) ? parsed.treatments : [],
     biopesticides: Array.isArray(parsed.biopesticides) ? parsed.biopesticides : [],
     precautions: Array.isArray(parsed.precautions) ? parsed.precautions : [],

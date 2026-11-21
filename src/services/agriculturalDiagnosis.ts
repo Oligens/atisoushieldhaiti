@@ -63,7 +63,7 @@ const diseaseLibrary = [
     weatherLink: 'Une humidité élevée et des périodes de rosée favorisent les infections.',
     prevention: ['Surveiller régulièrement le dessous des feuilles.', 'Éviter les plantations trop denses et limiter l’humidité prolongée du feuillage.', 'Utiliser des semences saines et des variétés tolérantes disponibles localement.'],
     management: ['Retirer les feuilles fortement atteintes lorsque cela est possible sans affaiblir la culture.', 'Éviter de déplacer les débris contaminés vers d’autres parcelles.', 'Consulter un conseiller pour choisir une méthode adaptée et autorisée.'],
-    match: (w: WeatherData) => w.humidity >= 75 && w.temperature >= 16 && w.temperature <= 28,
+    match: (w: WeatherData, _rain: number) => w.humidity >= 75 && w.temperature >= 16 && w.temperature <= 28,
     reason: 'Humidité ambiante élevée et température compatible avec la rouille.',
   },
   {
@@ -83,7 +83,7 @@ const diseaseLibrary = [
     weatherLink: 'La présence d’eau sur les feuilles, l’humidité et des températures favorables peuvent stimuler les infections.',
     prevention: ['Entretenir une ombre et une aération adaptées au système de culture.', 'Surveiller les feuilles basses et l’intérieur de la couronne.', 'Privilégier des plants sains et des variétés adaptées à la zone.'],
     management: ['Repérer les foyers et faire confirmer la rouille par un technicien.', 'Éviter les tailles sévères non recommandées.', 'N’appliquer un produit que si son usage sur caféier est autorisé et conseillé localement.'],
-    match: (w: WeatherData) => w.humidity >= 75 && w.temperature >= 18 && w.temperature <= 28,
+    match: (w: WeatherData, _rain: number) => w.humidity >= 75 && w.temperature >= 18 && w.temperature <= 28,
     reason: 'Humidité et température compatibles avec le développement de la rouille du caféier.',
   },
   {

@@ -393,7 +393,7 @@ export default function ResearchMode({ isDesktop }: Props) {
       <section className="glass-panel rounded-2xl p-6 mt-6">
         <h2 className="text-lg font-bold gradient-text mb-2">Export scientifique</h2>
         <p className="text-xs text-body-secondary mb-4">
-          Les fichiers incluent séparément les cas agricoles et les observations météo réellement stockés dans Neon. Aucune donnée fictive n’est ajoutée.
+          Les fichiers regroupent séparément les diagnostics du scanner, les observations météo, les consultations IA et les enquêtes professionnelles réellement enregistrés dans Neon. Aucune donnée fictive n’est ajoutée.
         </p>
         <div className="flex flex-wrap gap-3">
           <button disabled={exporting} onClick={() => exportData('csv')} className="cyber-button rounded-xl px-5 py-3 font-bold disabled:opacity-50">

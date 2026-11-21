@@ -8,13 +8,9 @@ function json(res: any, status: number, body: unknown) {
   res.status(status).setHeader('Content-Type', 'application/json').json(body);
 }
 
-function userId(req: any) {
+function userId(req: any): string | null {
   const value = req.headers?.['x-atisou-user-id'];
-  return typeof value === 'string' && value.trim() ? value.trim() : 'anonymous';
-}
-
-function isVisibleToActor(row: any, actor: string) {
-  return actor === 'anonymous' || String(row.user_id) === actor;
+  return typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value.trim()) ? value.trim() : null;
 }
 
 function buildMetrics(rows: any[]) {
@@ -70,19 +66,20 @@ export default async function handler(req: any, res: any) {
   if (!sql) return json(res, 500, { error: 'DATABASE_URL/NEON_DATABASE_URL absent dans Vercel.' });
   const path = typeof req.query?.path === 'string' ? req.query.path : '';
   const actor = userId(req);
+  if (!actor) return json(res, 401, { error: 'Session utilisateur absente. Reconnectez-vous avant d’accéder au corpus.' });
   try {
     if (req.method === 'GET' && path === 'stats') {
       const [caseRows, observationRows, surveyRows, eventRows] = await Promise.all([
         sql`SELECT crop, location, predicted_disease, confidence, validation_label, actual_disease
             FROM agricultural_cases
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
         sql`SELECT user_id FROM weather_observations
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'`,
+            WHERE user_id = ${actor}`,
         sql`SELECT id FROM agricultural_field_surveys
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'`,
+            WHERE user_id = ${actor}`,
         sql`SELECT id, event_type FROM agricultural_research_events
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'`,
+            WHERE user_id = ${actor}`,
       ]);
       const rows = caseRows as any[];
       const metrics = buildMetrics(rows);
@@ -125,14 +122,14 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'GET' && path === 'cases') {
       const rows = await sql`SELECT id, created_at, crop, location, latitude, longitude, predicted_disease, confidence, validation_label, actual_disease
         FROM agricultural_cases
-        WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+        WHERE user_id = ${actor}
         ORDER BY created_at DESC LIMIT 250`;
       return json(res, 200, rows);
     }
 
     if (req.method === 'GET' && path === 'field-surveys') {
       const rows = await sql`SELECT * FROM agricultural_field_surveys
-        WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+        WHERE user_id = ${actor}
         ORDER BY visit_date DESC LIMIT 250`;
       return json(res, 200, rows);
     }
@@ -140,7 +137,7 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'GET' && path === 'events') {
       const rows = await sql`SELECT id, source, event_type, prompt, ai_response, crop, location, latitude, longitude, weather, metadata, created_at
         FROM agricultural_research_events
-        WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+        WHERE user_id = ${actor}
         ORDER BY created_at DESC LIMIT 250`;
       return json(res, 200, rows);
     }
@@ -148,7 +145,7 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'GET' && path === 'observations') {
       const rows = await sql`SELECT id, observed_at, latitude, longitude, temperature, humidity, wind_speed, rainfall, weather
         FROM weather_observations
-        WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+        WHERE user_id = ${actor}
         ORDER BY observed_at DESC LIMIT 50`;
       return json(res, 200, rows);
     }
@@ -157,11 +154,11 @@ export default async function handler(req: any, res: any) {
       const [caseRows, observationRows] = await Promise.all([
         sql`SELECT location, latitude, longitude, confidence, validation_label
             FROM agricultural_cases
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
         sql`SELECT latitude, longitude, observed_at, weather
             FROM weather_observations
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY observed_at DESC`,
       ]);
       const grouped = new Map<string, any>();
@@ -202,16 +199,16 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'GET' && path === 'export') {
       const [cases, weatherObservations, fieldSurveys, researchEvents] = await Promise.all([
         sql`SELECT * FROM agricultural_cases
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
         sql`SELECT * FROM weather_observations
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY observed_at DESC`,
         sql`SELECT * FROM agricultural_field_surveys
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY visit_date DESC`,
         sql`SELECT * FROM agricultural_research_events
-            WHERE user_id = ${actor} OR ${actor} = 'anonymous'
+            WHERE user_id = ${actor}
             ORDER BY created_at DESC`,
       ]);
       return json(res, 200, {
@@ -250,7 +247,7 @@ export default async function handler(req: any, res: any) {
       }
       if (body.linked_case_id) {
         const linked = await sql`SELECT id FROM agricultural_cases
-          WHERE id=${body.linked_case_id} AND (user_id=${actor} OR ${actor}='anonymous') LIMIT 1`;
+          WHERE id=${body.linked_case_id} AND user_id=${actor} LIMIT 1`;
         if (!linked.length) return json(res, 404, { error: 'Le cas IA à valider est introuvable ou inaccessible.' });
       }
       const r = await sql`INSERT INTO agricultural_field_surveys
@@ -268,7 +265,7 @@ export default async function handler(req: any, res: any) {
               actual_disease=COALESCE(${body.field_diagnosis?.trim() || null},actual_disease),
               field_outcome=COALESCE(${body.follow_up_result || body.treatment_applied || null},field_outcome),
               updated_at=now()
-          WHERE id=${body.linked_case_id} AND (user_id=${actor} OR ${actor}='anonymous')`;
+          WHERE id=${body.linked_case_id} AND user_id=${actor}`;
       }
       return json(res, 201, r[0]);
     }
@@ -288,14 +285,14 @@ export default async function handler(req: any, res: any) {
       const r = await sql`UPDATE agricultural_cases
         SET validation_label=${body.validation_label ?? null}, actual_disease=${body.actual_disease?.trim() || null},
             field_outcome=${body.field_outcome ?? null}, weather=COALESCE(${body.weather ?? null},weather)
-        WHERE id=${body.id} AND (user_id=${actor} OR ${actor}='anonymous') RETURNING *`;
+        WHERE id=${body.id} AND user_id=${actor} RETURNING *`;
       if (!r.length) return json(res, 404, { error: 'Cas introuvable.' });
       return json(res, 200, r[0]);
     }
     if (req.method === 'PATCH' && path === 'cases-weather') {
       if (!body.id) return json(res, 400, { error: 'Identifiant de cas requis.' });
       const r = await sql`UPDATE agricultural_cases SET weather=${body.weather ?? null}
-        WHERE id=${body.id} AND (user_id=${actor} OR ${actor}='anonymous') RETURNING *`;
+        WHERE id=${body.id} AND user_id=${actor} RETURNING *`;
       if (!r.length) return json(res, 404, { error: 'Cas introuvable.' });
       return json(res, 200, r[0]);
     }

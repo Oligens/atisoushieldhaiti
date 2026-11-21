@@ -372,7 +372,7 @@ export default function ResearchMode({ isDesktop }: Props) {
             <textarea value={fieldForm.expert_notes} onChange={e => setFieldForm(v => ({...v,expert_notes:e.target.value}))} placeholder="Méthode d'observation, prélèvements, photos, laboratoire, limites..." className="cyber-input w-full rounded-xl px-3 py-3 mt-1 min-h-20" />
           </label>
           <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[11px] text-body-secondary">Les cas liés sont mis à jour dans les statistiques de validation du modèle. Les observations indépendantes restent séparées des métriques IA.</p>
+            <p className="text-[11px] text-body-secondary">Les enquêtes restent en attente jusqu’à vérification. Seules les références terrain vérifiées alimentent les métriques IA ; les observations indépendantes restent séparées.</p>
             <button type="submit" disabled={savingSurvey} className="cyber-button rounded-xl px-6 py-3 font-bold disabled:opacity-50">{savingSurvey ? 'Enregistrement...' : 'Enregistrer l’enquête terrain'}</button>
           </div>
         </form>

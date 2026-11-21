@@ -11,6 +11,11 @@ export interface AgriculturalCase {
   confidence: number;
   validation_label?: 'confirmed' | 'rejected' | 'uncertain' | null;
   actual_disease?: string | null;
+  ai_symptoms?: string[];
+  ai_explanation?: string | null;
+  ai_affected_area?: string | null;
+  ai_treatments?: string[];
+  ai_prevention?: string[];
   weather?: Record<string, unknown> | null;
   field_outcome?: string | null;
 }
@@ -46,6 +51,37 @@ export interface ModelMetrics {
   confusionMatrix: { actual: string; predicted: string; count: number }[];
 }
 
+export interface FieldResearchReport {
+  id: string;
+  case_id?: string | null;
+  investigator_name: string;
+  investigator_role: string;
+  institution?: string | null;
+  credential_reference?: string | null;
+  field_visit_date: string;
+  department?: string | null;
+  commune?: string | null;
+  locality?: string | null;
+  crop: string;
+  crop_stage?: string | null;
+  symptoms: string[];
+  field_diagnosis: string;
+  diagnosis_method: string;
+  diagnostic_status: 'confirmed' | 'rejected' | 'uncertain';
+  laboratory_reference?: string | null;
+  treatment_applied?: string | null;
+  treatment_product?: string | null;
+  treatment_active_ingredient?: string | null;
+  treatment_start_date?: string | null;
+  treatment_end_date?: string | null;
+  treatment_notes?: string | null;
+  field_outcome?: string | null;
+  follow_up_date?: string | null;
+  yield_impact?: string | null;
+  verification_status: 'pending' | 'verified' | 'rejected';
+  created_at: string;
+}
+
 export interface ResearchStats {
   totalCases: number;
   confirmed: number;
@@ -54,6 +90,9 @@ export interface ResearchStats {
   confirmationRate: number;
   averageConfidence: number;
   weatherObservations: number;
+  fieldReports: number;
+  pendingFieldReports: number;
+  verifiedFieldReports: number;
   byCrop: { label: string; value: number }[];
   byDisease: { label: string; value: number }[];
   byLocation: { label: string; value: number }[];
@@ -87,6 +126,38 @@ export async function saveWeatherObservation(input: {
   temperature: number; humidity: number; wind_speed: number; rainfall_mm?: number; source?: string;
 }) {
   return researchRequest('/api/research?path=weather-observations', { method: 'POST', body: JSON.stringify(input) });
+}
+
+
+export async function loadResearchCases() {
+  return researchRequest<AgriculturalCase[]>('/api/research?path=cases');
+}
+
+export async function loadFieldReports() {
+  return researchRequest<FieldResearchReport[]>('/api/research?path=field-reports');
+}
+
+export async function saveFieldReport(input: Omit<FieldResearchReport, 'id' | 'created_at' | 'verification_status'>) {
+  return researchRequest<FieldResearchReport>('/api/research?path=field-reports', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveFieldFollowup(input: {
+  report_id: string;
+  follow_up_date: string;
+  symptoms_evolution?: string;
+  disease_progression?: string;
+  treatment_continued?: string;
+  treatment_changed?: string;
+  observed_result: string;
+  yield_or_loss_observation?: string;
+}) {
+  return researchRequest('/api/research?path=field-followups', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function loadResearchStats() {

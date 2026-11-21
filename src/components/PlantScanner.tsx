@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { analyzePlantImage, type VisionDiagnosis } from '../services/agriculturalAI';
-import { attachWeatherToCase, saveAgriculturalCase, updateCaseValidation } from '../services/researchData';
+import { attachWeatherToCase, saveAgriculturalCase, saveResearchEvent, updateCaseValidation } from '../services/researchData';
 import { getWeatherData } from '../services/geolocation';
 import type { ValidationLabel } from '../services/fieldValidation';
 
@@ -44,6 +44,22 @@ export default function PlantScanner({ isDesktop }: PlantScannerProps) {
             field_outcome: null
           });
           setCaseId(saved.id);
+          await saveResearchEvent({
+            source: 'plant_scan',
+            event_type: 'plant_diagnosis',
+            crop: crop || 'Non renseigné',
+            location: location || 'Non renseigné',
+            latitude: match ? Number(match[1]) : null,
+            longitude: match ? Number(match[2]) : null,
+            metadata: {
+              caseId: saved.id,
+              predictedDisease: diagnosis.disease,
+              confidence: diagnosis.confidence,
+              affectedArea: diagnosis.affectedArea,
+              explanation: diagnosis.explanation,
+              uncertainty: diagnosis.uncertainty,
+            },
+          });
           if (match) {
             try {
               const weather = await getWeatherData(Number(match[1]), Number(match[2]));

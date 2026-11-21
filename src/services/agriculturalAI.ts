@@ -24,6 +24,7 @@ Localisation: ${input.location || 'non précisée'}
 Retourne UNIQUEMENT un JSON valide avec:
 {
   "disease": "nom de la maladie ou problème probable",
+  "symptoms": ["symptômes réellement visibles sur l'image"],
   "confidence": 0,
   "affectedArea": "zone observée",
   "explanation": "indices visuels et contexte qui motivent l'hypothèse",
@@ -47,6 +48,7 @@ confidence doit être un entier de 0 à 100. Pour une image ambiguë, utilise un
   const parsed = JSON.parse(raw) as VisionDiagnosis;
   return {
     disease: parsed.disease || 'Diagnostic indéterminé',
+    symptoms: Array.isArray(parsed.symptoms) ? parsed.symptoms.filter((item): item is string => typeof item === 'string') : [],
     confidence: Math.max(0, Math.min(100, Number(parsed.confidence) || 0)),
     affectedArea: parsed.affectedArea || 'Non déterminée',
     explanation: parsed.explanation || 'Aucune explication fournie.',

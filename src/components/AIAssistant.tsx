@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { askAgriculturalAI } from '../services/agriculturalAI';
+import { saveResearchEvent } from '../services/researchData';
 
 interface AIAssistantProps { isDesktop: boolean; }
 interface Message { id: string; type: 'user' | 'bot'; text: string; timestamp: string; }
@@ -32,6 +33,19 @@ export default function AIAssistant({ isDesktop }: AIAssistantProps) {
     try {
       const answer = await askAgriculturalAI(messageText);
       setMessages(prev => [...prev, { id: crypto.randomUUID(), type: 'bot', text: answer, timestamp: now() }]);
+      try {
+        await saveResearchEvent({
+          source: 'ai_assistant',
+          event_type: 'ai_consultation',
+          prompt: messageText,
+          ai_response: answer,
+          metadata: { interface: 'assistant_ia', language: 'fr' },
+        });
+      } catch (archiveError) {
+        setError(archiveError instanceof Error
+          ? 'Réponse IA obtenue, mais archivage dans le Mode Recherche impossible : ' + archiveError.message
+          : 'Réponse IA obtenue, mais archivage dans le Mode Recherche impossible.');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Assistant IA indisponible.');
     } finally {
@@ -46,7 +60,7 @@ export default function AIAssistant({ isDesktop }: AIAssistantProps) {
           <span className={`${isDesktop ? 'w-10 h-10' : 'w-8 h-8'} glass-panel neon-border-cyan rounded-full flex items-center justify-center animate-glow-pulse`}><i className="fa-solid fa-robot icon-gold"></i></span>
           ASSISTANT IA ATISOU
         </h1>
-        <p className="text-sm text-body-secondary mt-2">Assistant agricole connecté à un moteur IA sécurisé côté serveur.</p>
+        <p className="text-sm text-body-secondary mt-2">Assistant agricole connecté à un moteur IA sécurisé. Les consultations agricoles sont archivées dans votre corpus de recherche.</p>
       </div>
 
       <div className={`${isDesktop ? 'grid grid-cols-3 gap-6 flex-1' : 'flex-1 flex flex-col'} min-h-0`}>

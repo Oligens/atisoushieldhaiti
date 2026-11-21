@@ -27,6 +27,7 @@ Retourne UNIQUEMENT un JSON valide avec:
   "confidence": 0,
   "affectedArea": "zone observée",
   "explanation": "indices visuels et contexte qui motivent l'hypothèse",
+  "symptoms": ["liste des symptômes visibles sur la plante"],
   "treatments": ["mesures intégrées et prudentes"],
   "biopesticides": ["options de biocontrôle, sans dosage dangereux"],
   "precautions": ["précautions"],

@@ -295,8 +295,8 @@ export default function ResearchMode({ isDesktop }: Props) {
             {item.prompt && <p className="text-xs text-body mt-2">Question : {item.prompt}</p>}
             {item.ai_response && <p className="text-xs text-body-secondary mt-1 line-clamp-3">Réponse : {item.ai_response}</p>}
             {item.location && <p className="text-xs text-body-secondary mt-1">Lieu : {item.location}</p>}
-            {item.metadata?.predictedDisease && <p className="text-xs text-body-secondary mt-1">Diagnostic IA : {String(item.metadata.predictedDisease)} ({String(item.metadata.confidence ?? '')}%)</p>}
-            {item.metadata?.agriculturalRisk && <p className="text-xs text-body-secondary mt-1">Risque météo : {String((item.metadata.agriculturalRisk as Record<string, unknown>).level ?? 'calculé')} · score {String((item.metadata.agriculturalRisk as Record<string, unknown>).score ?? '—')}</p>}
+            {typeof item.metadata?.predictedDisease === 'string' && <p className="text-xs text-body-secondary mt-1">Diagnostic IA : {String(item.metadata.predictedDisease)} ({String(item.metadata.confidence ?? '')}%)</p>}
+            {item.metadata?.agriculturalRisk !== null && typeof item.metadata?.agriculturalRisk === 'object' && <p className="text-xs text-body-secondary mt-1">Risque météo : {String((item.metadata.agriculturalRisk as Record<string, unknown>).level ?? 'calculé')} · score {String((item.metadata.agriculturalRisk as Record<string, unknown>).score ?? '—')}</p>}
           </article>)}
         </div>}
       </section>

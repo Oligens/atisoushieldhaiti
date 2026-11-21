@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
 import { getCurrentPosition, getWeatherData, type LocationData, type WeatherData } from '../services/geolocation';
-import { saveWeatherObservation } from '../services/researchData';
+import { saveResearchEvent, saveWeatherObservation } from '../services/researchData';
 import AgriculturalDiagnosis from './AgriculturalDiagnosis';
 import { buildAgriculturalDiagnosis } from '../services/agriculturalDiagnosis';
 
@@ -158,6 +158,22 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
         ),
       };
       setLocation(enrichedLocation);
+      const rainfall72h = weatherResult.forecast.slice(0, 3)
+        .reduce((total, day) => total + (Number(day.precipitation) || 0), 0);
+      const risk = calculateAgriculturalRisk({
+        temperature: weatherResult.temperature,
+        humidity: weatherResult.humidity,
+        windSpeed: weatherResult.windSpeed,
+        rainfallMm: rainfall72h,
+      });
+      const weatherSnapshot = {
+        temperature: weatherResult.temperature,
+        humidity: weatherResult.humidity,
+        windSpeed: weatherResult.windSpeed,
+        description: weatherResult.description,
+        forecast: weatherResult.forecast,
+        rainfall72h,
+      };
       try {
         await saveWeatherObservation({
           latitude: lat,
@@ -165,9 +181,39 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
           temperature: weatherResult.temperature,
           humidity: weatherResult.humidity,
           wind_speed: weatherResult.windSpeed,
+          rainfall_mm: rainfall72h,
+          weather: {
+            ...weatherSnapshot,
+            address: enrichedLocation.address,
+            commune: enrichedLocation.commune,
+            department: enrichedLocation.department,
+            country: enrichedLocation.country,
+            source: enrichedLocation.source,
+            agriculturalRisk: risk,
+          },
         });
       } catch {
         // L'analyse reste disponible même si l'enregistrement distant échoue.
+      }
+      try {
+        await saveResearchEvent({
+          source: 'location_analysis',
+          event_type: 'location_weather_risk',
+          location: enrichedLocation.address,
+          latitude: lat,
+          longitude: lon,
+          weather: weatherSnapshot,
+          metadata: {
+            commune: enrichedLocation.commune,
+            department: enrichedLocation.department,
+            country: enrichedLocation.country,
+            source: enrichedLocation.source,
+            rainfall72h,
+            agriculturalRisk: risk,
+          },
+        });
+      } catch {
+        // L'analyse météo reste consultable même si l'archivage du corpus échoue.
       }
     } catch (err) {
       if (requestId !== requestSequence.current) return;

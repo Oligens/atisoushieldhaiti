@@ -81,7 +81,7 @@ export default async function handler(req: any, res: any) {
             WHERE user_id = ${actor} OR ${actor} = 'anonymous'`,
         sql`SELECT id FROM agricultural_field_surveys
             WHERE user_id = ${actor} OR ${actor} = 'anonymous'`,
-        sql`SELECT id FROM agricultural_research_events
+        sql`SELECT id, event_type FROM agricultural_research_events
             WHERE user_id = ${actor} OR ${actor} = 'anonymous'`,
       ]);
       const rows = caseRows as any[];
@@ -159,7 +159,7 @@ export default async function handler(req: any, res: any) {
             FROM agricultural_cases
             WHERE user_id = ${actor} OR ${actor} = 'anonymous'
             ORDER BY created_at DESC`,
-        sql`SELECT latitude, longitude, observed_at
+        sql`SELECT latitude, longitude, observed_at, weather
             FROM weather_observations
             WHERE user_id = ${actor} OR ${actor} = 'anonymous'
             ORDER BY observed_at DESC`,
@@ -183,7 +183,9 @@ export default async function handler(req: any, res: any) {
         const latitude = Number(row.latitude);
         const longitude = Number(row.longitude);
         // Regroupement spatial à environ 1 km, sans prétendre représenter une commune.
-        const key = 'Observation météo · ' + latitude.toFixed(2) + ', ' + longitude.toFixed(2);
+        const metadata = row.weather && typeof row.weather === 'object' ? row.weather : {};
+        const placeLabel = [metadata.commune, metadata.department, metadata.country].filter(Boolean).join(', ');
+        const key = placeLabel || ('Observation météo · ' + latitude.toFixed(2) + ', ' + longitude.toFixed(2));
         const point = grouped.get(key) || {
           location: key, cases: 0, observations: 0, confirmed: 0,
           avgConfidence: 0, latitude, longitude,

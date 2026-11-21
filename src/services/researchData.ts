@@ -94,6 +94,8 @@ export interface ResearchStats {
   averageConfidence: number;
   weatherObservations: number;
   fieldSurveys: number;
+  pendingFieldSurveys: number;
+  verifiedFieldSurveys: number;
   aiConsultations: number;
   researchEvents: number;
   byCrop: { label: string; value: number }[];
@@ -142,7 +144,7 @@ export async function saveResearchEvent(input: Omit<ResearchEvent, 'id' | 'creat
   return researchRequest<ResearchEvent>('/api/research?path=events', { method: 'POST', body: JSON.stringify(input) });
 }
 
-export async function saveFieldSurvey(input: Omit<FieldSurvey, 'id' | 'created_at'>) {
+export async function saveFieldSurvey(input: Omit<FieldSurvey, 'id' | 'created_at' | 'verification_status' | 'verified_at'>) {
   return researchRequest<FieldSurvey>('/api/research?path=field-surveys', { method: 'POST', body: JSON.stringify(input) });
 }
 

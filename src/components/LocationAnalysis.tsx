@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { calculateAgriculturalRisk } from '../services/agriculturalRisk';
 import { getCurrentPosition, getWeatherData, type LocationData, type WeatherData } from '../services/geolocation';
 import { saveWeatherObservation } from '../services/researchData';
+import AgriculturalDiagnosis from './AgriculturalDiagnosis';
+import { buildAgriculturalDiagnosis } from '../services/agriculturalDiagnosis';
 
 interface LocationAnalysisProps { isDesktop: boolean; }
 interface PlaceResult {
@@ -89,6 +91,7 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [mapLayer, setMapLayer] = useState<MapLayer>('plan');
+  const [diagnosisView, setDiagnosisView] = useState<'none' | 'summary' | 'details'>('none');
   const requestSequence = useRef(0);
 
   const loadWeatherForPlace = async (
@@ -289,6 +292,24 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
         rainfallMm: rainfall72h,
       })
     : null;
+  const diagnosis = weather && analysis
+    ? buildAgriculturalDiagnosis(weather, analysis, rainfall72h)
+    : null;
+  const locationLabel = location
+    ? [location.flagEmoji, location.commune || location.region, location.department, location.country].filter(Boolean).join(' · ')
+    : 'Zone sélectionnée';
+
+  if (diagnosisView === 'details' && diagnosis) {
+    return (
+      <AgriculturalDiagnosis
+        mode="details"
+        diagnosis={diagnosis}
+        locationLabel={locationLabel}
+        onClose={() => setDiagnosisView('none')}
+        onDetails={() => setDiagnosisView('details')}
+      />
+    );
+  }
 
   return (
     <div className={isDesktop ? 'p-8 animate-fade-in' : 'pt-14 pb-20 min-h-screen px-4 animate-fade-in'}>
@@ -387,7 +408,14 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
                   <p className="text-body-secondary"><span className="text-gold">Pays :</span> {location.country || 'Non identifié'} {location.flagEmoji || ''}</p>
                 </div>
                 <p className="text-[11px] text-body-secondary mt-3 break-words">{location.address}</p>
-                <p className="text-[11px] text-body-secondary mt-1">
+                <button
+                  type="button"
+                  onClick={() => setDiagnosisView('summary')}
+                  className="cyber-button rounded-xl px-4 py-2.5 text-xs font-bold mt-4"
+                >
+                  <i className="fa-solid fa-stethoscope mr-2"></i>Diagnostic agricole détaillé
+                </button>
+                <p className="text-[11px] text-body-secondary mt-3">
                   Coordonnées : {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
                   {' · '}
                   {location.source === 'ip'
@@ -510,6 +538,15 @@ export default function LocationAnalysis({ isDesktop }: LocationAnalysisProps) {
               </section>
             )}
           </div>
+          {diagnosis && diagnosisView === 'summary' && (
+            <AgriculturalDiagnosis
+              mode="summary"
+              diagnosis={diagnosis}
+              locationLabel={locationLabel}
+              onClose={() => setDiagnosisView('none')}
+              onDetails={() => setDiagnosisView('details')}
+            />
+          )}
         </>
       )}
 
